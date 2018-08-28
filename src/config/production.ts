@@ -13,8 +13,8 @@ export var production: Config = {
         error: true
     },
     credentials: {
-        secretToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7InVzZXJfaWQiOjF9LCJpYXQiOjE1MjE4NzcxODd9.PqMe0hiIHF8fAY5uPFd39-jGQeX7UhBXYDJvHG44UAV6ATMHwUmtvZNVYvyiyP0CLKOF1ojhydcewGxUTTHEOzC3cqSn12rjX1kfY9_uLBwRcqwES7IPSQpHlDqeBLL8JnkmNFoQvRyw23ddbcX1nmU7RKTBmb7_VrUFmYrGAmE",
-        credentialKey: "3wQYKXLaqj"
+        secretToken: "",
+        credentialKey: ""
     },
     database: {
         filedb: './data/files.db',

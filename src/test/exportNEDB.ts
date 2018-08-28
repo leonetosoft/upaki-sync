@@ -1,4 +1,4 @@
-import * as Datastore from 'nedb';
+/*import * as Datastore from 'nedb';
 import { EntityUpload } from "../persist/entities/EntityUpload";
 import { Environment } from './../config/env';
 import { development } from './../config/development';
@@ -85,4 +85,4 @@ async function exportFolders() {
 }
 
 
-exportFolders();
+exportFolders();*/

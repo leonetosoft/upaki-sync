@@ -1,0 +1,9 @@
+.DS_Store
+node_modules
+logs
+lib/*
+lib-esm
+dist
+data
+package-lock.json
+_bundles

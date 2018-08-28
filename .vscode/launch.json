@@ -1,0 +1,112 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Scanner",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/test/testScanFast.ts"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Inspecionar Arquivo Atual",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceRoot}/node_modules/ts-node/dist/_bin.js",
+            "args": ["${relativeFile}"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector"
+        },
+        {
+            "name": "Ligar Sincronizador",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/index.ts", "--dev", "/home/leonetosoft/testesync/"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },{
+            "name": "Ligar Sincronizador Win",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/index.ts", "--dev", "C:\\Users\\leonetosoft\\Documents\\Pasta Sincronizada"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Ligar Teste Absolute Path",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/test/testAbsolutePath.ts"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "esti",
+            "type": "node",
+            "request": "launch",
+            "args": ["${relativeFile}", "--dev"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Ligar Api --Prod",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/index.ts", "--prod", "api"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Ligar Baixa --Dev",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/index.ts", "--dev", "baixa"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Ligar Baixa Url --Dev",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/index.ts", "--dev", "baixa_url"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Ligar Gerador Ted --Dev",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/index.ts", "--prod", "gerador_ted"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Current TS Tests File",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceRoot}/node_modules/.bin/_mocha",
+            "args": ["-r", "ts-node/register", "${relativeFile}"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector"
+        }
+    ]
+}

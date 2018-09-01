@@ -5,11 +5,8 @@ export * from './persist';
 export * from './queue';
 export * from './socket';
 export * from './sync';
-export * from './test';
 export * from './thread';
 export * from './util';
-export * from './bootTest';
-export * from './credits';
 export * from './indexClusterV2';
 
 import { Environment, Config } from './config/env';

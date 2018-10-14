@@ -1,12 +1,12 @@
 import * as cluster from 'cluster';
-import { WorkerScanProcess } from './WorkerScanProcess';
-import { WorkerProcessFile } from './WorkerProcessFile';
-import { WorkerUpload } from './WorkerUpload';
-import { WorkerSocket } from './WorkerSocket';
 import { Worker } from 'cluster';
 import { Logger } from '../util/Logger';
 import { WorkProcess } from './UtilWorker';
 import * as events from 'events';
+import { UIEvents } from '../ipc/UIEvents';
+import { SharedReceiveCall, SharedResponseCall } from '../ipc/EventBinding';
+import { FunctionsBinding } from '../ipc/FunctionsBinding';
+import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
 export class WorkerMaster {
     private static _instance: WorkerMaster;
     WORKER_SOCKET: Worker;
@@ -15,6 +15,7 @@ export class WorkerMaster {
     WORKER_UPLOAD: Worker;
     WORKER_WHATCHER: Worker;
     events: events.EventEmitter;
+    implUi: UIEvents[] = [];
 
     constructor() {
         this.events = new events.EventEmitter();
@@ -24,7 +25,13 @@ export class WorkerMaster {
         return this._instance || (this._instance = new this());
     }
 
+    public RegisterUI(ui: UIEvents) {
+        this.implUi.push(ui);
+    }
+
     Init() {
+        FunctionsBinding.Instance;
+        UIFunctionsBinding.Instance;
         this.WORKER_PROCESS_FILE = cluster.fork();
         this.WORKER_PROCESS_FILE.on('message', this.Listen.bind(this));
         this.WORKER_PROCESS_FILE.on('online', () => {
@@ -54,7 +61,7 @@ export class WorkerMaster {
             });
         });
     }
-    
+
 
     ProcessStarted() {
         try {
@@ -97,7 +104,7 @@ export class WorkerMaster {
                 Logger.error(`Closed Worker - [WORKER_WHATCHER] - Cluster ID=${worker.id} Closed Code=${code}`);
                 this.WORKER_WHATCHER = cluster.fork();
 
-                
+
                 this.WORKER_WHATCHER.on('message', this.Listen.bind(this));
                 this.WORKER_WHATCHER.on('online', () => {
                     this.WORKER_WHATCHER.send({ type: 'CONFIG_WORKER', work: WorkProcess.WORKER_WHATCHER });
@@ -162,6 +169,17 @@ export class WorkerMaster {
                 break;
             case WorkProcess.WORKER_SCAN_PROCESS:
                 this.WORKER_SCAN_PROCESS.send({ type: msg.type_to, data: msg.data });
+                break;
+            case WorkProcess.MASTER:
+                switch (msg.type_to) {
+                    case 'SEND_REQUEST_CALL':
+                        SharedReceiveCall(msg.data);
+                        break;
+
+                    case 'RECEIVE_CALL_RESPONSE':
+                        SharedResponseCall(msg.data);
+                        break;
+                }
                 break;
         }
     }

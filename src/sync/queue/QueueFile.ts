@@ -1,11 +1,8 @@
 import { FileTask } from './../task/FileTask';
-import { Task } from './../../queue/task';
 import { Processor } from "./../../queue/processor";
 import { Job } from "./../../queue/job";
-import * as moment from "moment";
 import { Environment } from '../../config/env';
 import { Logger } from '../../util/Logger';
-import { WorkerProcessFile } from '../../thread/WorkerProcessFile';
 
 export class QueueFile {
     private static _instance: QueueFile;

@@ -1,11 +1,6 @@
 import { UploadState } from './../../sync/task/UploaderTask';
 import { S3StreamSessionDetails } from 'upaki-cli';
-import { Logger } from '../../util/Logger';
-import { Environment } from '../../config/env';
-import * as fs from 'fs';
 import * as crypto from 'crypto';
-import * as path from 'path';
-import ErrnoException = NodeJS.ErrnoException;
 import { Database } from '../Database';
 
 export interface EntityUploadData {

@@ -3,8 +3,8 @@ import { Config } from "./env";
 export var development: Config = {
     version: '1.0.0',
     useCluster: true,
-    synchPath: "C:\\Users\\leonetosoft\\Documents\\FolderSincronize"/*"E:\\"*/,
-    credentialsPath: "C:\\Users\\leonetosoft\\Documents\\vxMLNEYl5P.apikey.json",
+    synchPath: "C:\\Users\\Leonardo\\Upaki"/*"E:\\"*/,
+    credentialsPath: "C:\\Users\\Leonardo\\XdqL09gy83.apikey.json",
     logging: {
         type: ['console', 'file', 'sentry'],
         warn: true,

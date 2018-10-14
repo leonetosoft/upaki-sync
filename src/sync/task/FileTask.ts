@@ -1,15 +1,13 @@
 import { QueueFile } from './../queue/QueueFile';
-import { UploaderTask, UploadState } from './UploaderTask';
-import { QueueUploader } from './../queue/QueueUploader';
+import { UploadState } from './UploaderTask';
 import { EntityUpload } from './../../persist/entities/EntityUpload';
 import { File } from './../File';
-import { Task, PRIORITY_QUEUE } from './../../queue/task';
+import { Task } from './../../queue/task';
 import { Logger } from '../../util/Logger';
 import { Environment } from '../../config/env';
 import { S3StreamSessionDetails } from 'upaki-cli';
-import { WorkerProcessFile } from '../../thread/WorkerProcessFile';
-import { Util } from '../../util/Util';
 import * as fs from 'fs';
+import { FunctionsBinding } from '../../ipc/FunctionsBinding';
 
 export enum FileTypeAction {
     ADD = 'ADD',
@@ -32,20 +30,7 @@ export class FileTask extends Task {
      * @param path 
      */
     private StopUploadsOfPath(path) {
-        if (!Environment.config.useCluster) {
-            QueueUploader.Instance.tasks.getTaskListByPriority().forEach(job => {
-                try {
-                    if (job.task.file.getPath() === path) {
-                        Logger.debug(`Request cancel taskId=${job.task.id}`);
-                        job.task.Cancel();
-                    }
-                } catch (error) {
-                    Logger.error(error);
-                }
-            });
-        } else {
-            WorkerProcessFile.Instance.RequestStopUpload(path);
-        }
+        FunctionsBinding.Instance.StopUpload(path);
     }
 
     /**
@@ -80,12 +65,16 @@ export class FileTask extends Task {
     private addUploadQueue(file: File, session: S3StreamSessionDetails = {
         Parts: [],
         DataTransfered: 0
-    }) {
-        if (!Environment.config.useCluster) {
-            QueueUploader.Instance.addJob(Util.ProcessPriority(new UploaderTask(file, session)));
-        } else {
-            WorkerProcessFile.Instance.AddUploadQueue(file, session);
-        }
+    }): Promise<any> {
+        return new Promise((resolve, reject) => {
+            FunctionsBinding.Instance.UploadFile(file.filePath, session, file.rootFolder, (err, rs) => {
+                if (err) {
+                    reject(new Error(err));
+                } else {
+                    resolve();
+                }
+            });
+        })
     }
 
     async Analize() {
@@ -106,11 +95,10 @@ export class FileTask extends Task {
             if (this.action == FileTypeAction.ADD) {
                 if (fileData) {
                     if (fileData.state === UploadState.FINISH && fileData.lastModifies !== this.file.getLastModifies()) {
-                        // QueueUploader.Instance.addJob(this.ProcessPriority(new UploaderTask(this.file)));
-                        this.addUploadQueue(this.file);
+                        await this.addUploadQueue(this.file);
                     }
                     else if (fileData.state !== UploadState.FINISH) {
-                        if(!fs.existsSync(fileData.path)){
+                        if (!fs.existsSync(fileData.path)) {
                             await EntityUpload.Instance.delete(fileData.path);
                             this.job.Finish();
                         }

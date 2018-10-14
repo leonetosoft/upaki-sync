@@ -25,7 +25,7 @@ export function BootSync(config: Config){
                     case 1:
                         Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_PROCESS_FILE;
-                        WorkerProcessFile.Instance.Init(Environment.config.synchPath);
+                        WorkerProcessFile.Instance.Init();
                         break;
                     case 2:
                         Database.Instance.setMaster();
@@ -39,7 +39,7 @@ export function BootSync(config: Config){
                     case 4:
                         Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_SCAN_PROCESS;
-                        let scan = new WorkerScanProcess(Environment.config.synchPath);
+                        let scan = new WorkerScanProcess();
                         scan.InitSync();
                         break;
                     case 5:

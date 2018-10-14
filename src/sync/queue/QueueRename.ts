@@ -1,4 +1,3 @@
-import { Task } from './../../queue/task';
 import { Processor } from "./../../queue/processor";
 import { Job } from "./../../queue/job";
 import { Environment } from '../../config/env';

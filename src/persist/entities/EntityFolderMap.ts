@@ -1,7 +1,3 @@
-import { UploadState } from './../../sync/task/UploaderTask';
-import { S3StreamSessionDetails } from 'upaki-cli';
-import { Logger } from '../../util/Logger';
-import { Environment } from '../../config/env';
 import * as crypto from 'crypto';
 import { Database } from '../Database';
 

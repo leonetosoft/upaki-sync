@@ -5,7 +5,6 @@ import * as os from 'os';
 import * as path from 'path';
 import { PRIORITY_QUEUE } from '../queue/task';
 import { UploaderTask } from '../sync/task/UploaderTask';
-import { File } from '../sync/File';
 
 export namespace Util {
     /**

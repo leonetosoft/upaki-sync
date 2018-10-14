@@ -46,6 +46,7 @@ export class NativeEventsEmitter extends events.EventEmitter implements NativeEv
 export class NSFW extends NativeEventsEmitter {
     scan;
     rootDir: string;
+    whatch: any;
     awaitingCopy: ChangesWhatch[] = [];
     constructor(rootDir: string) {
         super();
@@ -140,8 +141,14 @@ export class NSFW extends NativeEventsEmitter {
         })
     }
 
+    Stop() {
+        if(this.whatch) {
+            this.whatch.stop();
+        }
+    }
+
     Init() {
-        nsfw(this.rootDir, (events) => {
+        this.whatch = nsfw(this.rootDir, (events) => {
             // handle events
             // console.log(events.length);
             let files = [];

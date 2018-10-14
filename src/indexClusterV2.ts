@@ -5,20 +5,7 @@ import { production } from './config/production';
 import { development } from './config/development';
 import "reflect-metadata";
 import { Environment } from './config/env';
-import * as AWS from 'aws-sdk';
 import * as fs from 'fs';
-import * as zlib from 'zlib';
-import { Upaki } from 'upaki-cli';
-import { Logger } from './util/Logger';
-import { PrintCredits } from './credits';
-import { SyncDataNative } from './sync/SyncDataNative';
-import * as cluster from 'cluster';
-import { WorkerMaster } from './thread/WorkerMaster';
-import { WorkerProcessFile } from './thread/WorkerProcessFile';
-import { WorkerUpload } from './thread/WorkerUpload';
-import { WorkerSocket } from './thread/WorkerSocket';
-import { WorkerScanProcess } from './thread/WorkerScanProcess';
-import { WorkerWatcher } from './thread/WorkerWatcher';
 import { BootSync } from './index';
 
 

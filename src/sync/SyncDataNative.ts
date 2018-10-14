@@ -1,16 +1,11 @@
-import { FileTask, FileTypeAction } from './task/FileTask';
-import { File } from './File';
+import { FileTypeAction } from './task/FileTask';
 import { QueueFile } from './queue/QueueFile';
-import * as chokidar from 'chokidar';
-import * as fs from 'fs';
 import { Logger } from '../util/Logger';
 import { Environment } from '../config/env';
 import { SocketClient } from '../socket/SocketClient';
 import { QueueUploader } from './queue/QueueUploader';
-import { PRIORITY_QUEUE } from '../queue/task';
 import { NSFW, ChangesWhatch } from './NSFW';
 import { QueueRename } from './queue/QueueRename';
-import { RenameTask } from './task/RenameTask';
 import { WorkerWatcher } from '../thread/WorkerWatcher';
 import { Util } from '../util/Util';
 
@@ -19,26 +14,6 @@ export class SyncDataNative {
     watcher: NSFW;
     constructor(folderPath: string) {
         this.rootFolder = folderPath;
-    }
-
-    StartSystem() {
-        if (!Environment.config.useCluster) {
-            this.Scan().then((files: string[]) => {
-                Logger.info(`Total of ${files.length}, add to queue.`);
-                // fs.writeFileSync('FILA.json', JSON.stringify(files, null, 4), 'utf8');
-                files.forEach(element => {
-                    if (element !== null && element !== undefined)
-                        QueueFile.Instance.addJob(new FileTask(new File(element, this.rootFolder), FileTypeAction.ADD));
-                });
-                Logger.info(`Queue file ok.`);
-            }).then(() => {
-                this.StartWhatch();
-            }).catch(err => {
-                Logger.error(err);
-            });
-        } else {
-            this.StartWhatch();
-        }
     }
 
     Scan() {
@@ -65,6 +40,10 @@ export class SyncDataNative {
         } else {
             return false;
         }
+    }
+
+    Stop() {
+        this.watcher.Stop();
     }
 
     StartWhatch() {
@@ -109,16 +88,7 @@ export class SyncDataNative {
             if (!this.IsValidFile(change.key)) {
                 return;
             }
-            if (!Environment.config.useCluster) {
-                if (change.type === 'file') {
-                    Logger.debug(`New file add ${change.key}`);
-                    QueueFile.Instance.addJob(new FileTask(new File(change.key, this.rootFolder), FileTypeAction.ADD));
-                } else {
-                    Logger.warn(`Ignored folder creation ${change.key}`);
-                }
-            } else {
-                WorkerWatcher.Instance.AddFileTask(change.type, change.key, FileTypeAction.ADD);
-            }
+            WorkerWatcher.Instance.AddFileTask(change.type, change.key, FileTypeAction.ADD, undefined, this.rootFolder);
         } catch (error) {
             Logger.error(error);
         }
@@ -129,18 +99,7 @@ export class SyncDataNative {
             if (!this.IsValidFile(change.key)) {
                 return;
             }
-            if (!Environment.config.useCluster) {
-                if (change.type === 'file') {
-                    Logger.debug(`New file renamed ${change.key}`);
-                    let job = new FileTask(new File(change.key, this.rootFolder), FileTypeAction.RENAME);
-                    job.priority = PRIORITY_QUEUE.HIGH;
-                    QueueFile.Instance.addJob(job);
-                }
-
-                QueueRename.Instance.addJob(new RenameTask(change.key, change.oldKey, this.rootFolder));
-            } else {
-                WorkerWatcher.Instance.AddFileTask(change.type, change.key, FileTypeAction.RENAME, change.oldKey);
-            }
+            WorkerWatcher.Instance.AddFileTask(change.type, change.key, FileTypeAction.RENAME, change.oldKey, this.rootFolder);
         } catch (error) {
             Logger.error(error);
         }
@@ -151,16 +110,8 @@ export class SyncDataNative {
             if (!this.IsValidFile(change.key)) {
                 return;
             }
-            if (!Environment.config.useCluster) {
-                if (change.type === 'file') {
-                    Logger.debug(`Remove file ${change.key}`);
-                    let job = new FileTask(new File(change.key, this.rootFolder), FileTypeAction.UNLINK);
-                    job.priority = PRIORITY_QUEUE.HIGH;
-                    QueueFile.Instance.addJob(job);
-                }
-            } else {
-                WorkerWatcher.Instance.AddFileTask(change.type, change.key, FileTypeAction.UNLINK);
-            }
+            WorkerWatcher.Instance.AddFileTask(change.type, change.key, FileTypeAction.UNLINK, undefined, this.rootFolder);
+
         } catch (error) {
             Logger.error(error);
         }
@@ -172,16 +123,7 @@ export class SyncDataNative {
             if (!this.IsValidFile(change.key)) {
                 return;
             }
-            if (!Environment.config.useCluster) {
-                if (change.type === 'file') {
-                    Logger.debug(`New file changed ${change.key}`);
-                    let job = new FileTask(new File(change.key, this.rootFolder), FileTypeAction.CHANGE);
-                    job.priority = PRIORITY_QUEUE.HIGH;
-                    QueueFile.Instance.addJob(job);
-                }
-            } else {
-                WorkerWatcher.Instance.AddFileTask(change.type, change.key, FileTypeAction.CHANGE);
-            }
+            WorkerWatcher.Instance.AddFileTask(change.type, change.key, FileTypeAction.CHANGE, undefined, this.rootFolder);
         } catch (error) {
             Logger.error(error);
         }

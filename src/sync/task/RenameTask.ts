@@ -6,7 +6,6 @@ import { Environment } from "../../config/env";
 import { Logger } from "../../util/Logger";
 import { EntityUpload } from "../../persist/entities/EntityUpload";
 import { Util } from "../../util/Util";
-import * as path from 'path';
 import { QueueFile } from "../queue/QueueFile";
 import { FileTask, FileTypeAction } from "./FileTask";
 import { File } from "../File";

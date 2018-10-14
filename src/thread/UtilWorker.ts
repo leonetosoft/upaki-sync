@@ -8,7 +8,7 @@ export enum WorkProcess {
 }
 
 export interface IMessageToWorker {
-    type: 'FILE_LIST' /* Lista de arquivos */|'UPLOAD_LIST' | 'DO_UPLOAD' | 'DATABASE' | 'DATABASE_RESPONSE' | 'CONTINUE_SCAN' | 'STOP_UPLOAD' | 'ADD_FILE' | 'UPLOAD_STATE' | 'UPLOAD_NOTIFY',
+    type: 'SEND_REQUEST_CALL' | 'RECEIVE_CALL_RESPONSE' | 'FILE_LIST' /* Lista de arquivos */ | 'UPLOAD_LIST' | 'DO_UPLOAD' | 'DATABASE' | 'DATABASE_RESPONSE' | 'CONTINUE_SCAN' | 'STOP_UPLOAD' | 'ADD_FILE' | 'UPLOAD_STATE' | 'UPLOAD_NOTIFY',
     data: any
 }
 

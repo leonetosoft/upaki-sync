@@ -1,12 +1,10 @@
 import { EntityUpload } from './../../persist/entities/EntityUpload';
 import { File } from './../File';
 import { Task } from './../../queue/task';
-import * as fs from 'fs';
 import { Util } from '../../util/Util';
 import { Logger } from '../../util/Logger';
 import { Upaki, UploadEvents } from 'upaki-cli';
 import { Environment } from '../../config/env';
-import * as path from 'path';
 import { S3StreamSessionDetails } from 'upaki-cli';
 import { S3StreamEvents, Parts } from 'upaki-cli';
 import { EntityFolderMap } from '../../persist/entities/EntityFolderMap';

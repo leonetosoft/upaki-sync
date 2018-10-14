@@ -1,8 +1,6 @@
 import { UploaderTask } from '../task/UploaderTask';
-import { Task } from './../../queue/task';
 import { Processor } from "./../../queue/processor";
 import { Job } from "./../../queue/job";
-import * as moment from "moment";
 import { Environment } from '../../config/env';
 import { Logger } from '../../util/Logger';
 import { WorkerUpload } from '../../thread/WorkerUpload';

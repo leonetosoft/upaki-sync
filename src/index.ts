@@ -1,13 +1,7 @@
 // created from 'create-ts-index'
-
-export * from './config';
-export * from './persist';
-export * from './queue';
-export * from './socket';
-export * from './sync';
-export * from './thread';
-export * from './util';
 export * from './indexClusterV2';
+
+export * from './ipc/EventBinding';
 
 import { Environment, Config } from './config/env';
 import * as cluster from 'cluster';
@@ -22,12 +16,13 @@ import { WorkerScanProcess } from './thread/WorkerScanProcess';
 import { WorkerWatcher } from './thread/WorkerWatcher';
 import { Logger } from './util/Logger';
 
-export function BootSync(config: Config){
+export function BootSync(config: Config) {
     Environment.config = config;
 
     if (cluster.isMaster) {
         PrintCredits();
         Environment.config.worker = WorkProcess.MASTER;
+        Database.Instance.setMaster();
         WorkerMaster.Instance.Init();
     } else if (cluster.isWorker) {
         process.once('message', (msg) => {
@@ -36,7 +31,7 @@ export function BootSync(config: Config){
                     case 1:
                         Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_PROCESS_FILE;
-                        WorkerProcessFile.Instance.Init(Environment.config.synchPath);
+                        WorkerProcessFile.Instance.Init();
                         break;
                     case 2:
                         Database.Instance.setMaster();
@@ -50,11 +45,12 @@ export function BootSync(config: Config){
                     case 4:
                         Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_SCAN_PROCESS;
-                        let scan = new WorkerScanProcess(Environment.config.synchPath);
-                        scan.InitSync();
+                        WorkerScanProcess.Instance.InitSync();
+                        /*let scan = new WorkerScanProcess(Environment.config.synchPath);
+                        scan.InitSync();*/
                         break;
                     case 5:
-                        // Database.Instance.setMaster();
+                        Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_WHATCHER;
                         WorkerWatcher.Instance.Init();
                         break;

@@ -6,7 +6,7 @@ import * as uuidv1 from 'uuid/v1';
 export class Job<T extends Task> {
     public task: T;
     public stat: STATUS = STATUS.PENDING;
-    public id: number;
+    public id: string;
     private processor: Processor<T>;
     private retries: number;
 

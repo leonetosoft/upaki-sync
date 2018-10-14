@@ -1,16 +1,16 @@
-import { Database } from './../persist/Database';
-import { Worker } from "cluster";
 import { Logger } from "../util/Logger";
-import { Shutdown } from "./UtilWorker";
+import { WorkProcess } from "./UtilWorker";
 import { SocketClient } from "../socket/SocketClient";
+import { SystemWorker } from './SystemWorker';
 
-export class WorkerSocket {
+export class WorkerSocket extends SystemWorker {
   UPLOAD_LIST = [];
   SIZE_SEND = 0;
   TOTAL_SEND = 0;
   private static _instance: WorkerSocket;
 
   constructor() {
+    super(WorkProcess.WORKER_SOCKET);
     Logger.info(`[WorkerSocket] Worker ${process.pid} start!`);
   }
 
@@ -20,18 +20,13 @@ export class WorkerSocket {
 
   Init() {
     SocketClient.Instance;
-    process.on('message', this.Listen.bind(this));
+    // process.on('message', this.Listen.bind(this));
   }
 
   Listen(msg: any) {
     try {
-      if (msg === 'shutdown') {
-        Shutdown();
-        return;
-      }
-
       switch (msg.type) {
-        case 'UPLOAD_STATE':
+        /*case 'UPLOAD_STATE':
           this.UpdateUploadList(msg.data);
           break;
 
@@ -47,7 +42,7 @@ export class WorkerSocket {
               this.UPLOAD_LIST.splice(findIndex, 1);
             }
           }
-          break;
+          break;*/
 
         case 'UPLOAD_LIST':
           this.UPLOAD_LIST = msg.data.list;
@@ -55,9 +50,9 @@ export class WorkerSocket {
           this.TOTAL_SEND = msg.data.numberOfUploads;
           break;
 
-        case 'DATABASE_RESPONSE':
+       /* case 'DATABASE_RESPONSE':
           Database.Instance.DbResponse(msg.data);
-          break;
+          break;*/
       }
     } catch (error) {
       Logger.error(error);

@@ -1,16 +1,18 @@
-import { Database } from './../persist/Database';
-import { Worker } from "cluster";
 import { Logger } from "../util/Logger";
-import { Shutdown, MessageToWorker, WorkProcess } from "./UtilWorker";
+import { WorkProcess } from "./UtilWorker";
 import { Util } from "../util/Util";
 import { QueueUploader } from "../sync/queue/QueueUploader";
 import { UploaderTask, UploadState } from "../sync/task/UploaderTask";
 import { File } from "../sync/File";
-import { Processor } from '../queue/processor';
+import { SystemWorker } from './SystemWorker';
+import { S3StreamSessionDetails } from "upaki-cli";
+import { FunctionsBinding } from "../ipc/FunctionsBinding";
+import { UIFunctionsBinding } from "../ipc/UIFunctionsBinding";
 
-export class WorkerUpload {
+export class WorkerUpload extends SystemWorker {
     private static _instance: WorkerUpload;
     constructor() {
+        super(WorkProcess.WORKER_UPLOAD);
         Logger.info(`[WorkerUpload] Worker ${process.pid} start!`);
     }
 
@@ -19,19 +21,24 @@ export class WorkerUpload {
     }
 
     Init() {
-        process.on('message', this.Listen.bind(this));
+        // process.on('message', this.Listen.bind(this));
         QueueUploader.Instance.tasks.Start();
+    }
+
+    StartUpload(src, session: S3StreamSessionDetails, rootFolder: string) {
+        let file = new File(src, rootFolder);
+        QueueUploader.Instance.addJob(Util.ProcessPriority(new UploaderTask(file, session)));
     }
 
     Listen(msg: any) {
         try {
-            if (msg === 'shutdown') {
+            /*if (msg === 'shutdown') {
                 Shutdown();
                 return;
-            }
+            }*/
 
             switch (msg.type) {
-                case 'DO_UPLOAD':
+                /*case 'DO_UPLOAD':
                     let file = new File(msg.data.file.filePath, msg.data.file.rootFolder);
                     QueueUploader.Instance.addJob(Util.ProcessPriority(new UploaderTask(file, msg.data.session)));
                     break;
@@ -42,14 +49,14 @@ export class WorkerUpload {
 
                 case 'DATABASE_RESPONSE':
                     Database.Instance.DbResponse(msg.data);
-                    break;
+                    break;*/
             }
         } catch (error) {
             Logger.error(error);
         }
     }
 
-    private StopUploadsOfPath(path) {
+    public StopUploadsOfPath(path) {
         QueueUploader.Instance.tasks.getTaskListByPriority().forEach(job => {
             try {
                 if (job.task.file.getPath() === path) {
@@ -62,7 +69,7 @@ export class WorkerUpload {
         });
     }
 
-    AddUpload(upload: UploaderTask) {
+    /*AddUpload(upload: UploaderTask) {
         try {
             MessageToWorker(WorkProcess.WORKER_SOCKET, { type: 'UPLOAD_NOTIFY', data: { stateType: 'ADD', size: upload.file.getSize() } });
         } catch (error) {
@@ -76,7 +83,7 @@ export class WorkerUpload {
         } catch (error) {
             Logger.error(error);
         }
-    }
+    }*/
 
     sendUploadList() {
         try {
@@ -115,12 +122,24 @@ export class WorkerUpload {
                 }
             });
 
-            MessageToWorker(WorkProcess.WORKER_SOCKET, {
+            /*MessageToWorker(WorkProcess.WORKER_SOCKET, {
                 type: 'UPLOAD_LIST', data: {
                     list: listUpload,
                     numberOfUploads: numberOfUploads,
                     totalSend: totalSend
                 }
+            });*/
+
+            FunctionsBinding.Instance.UpdateUploadList({
+                list: listUpload,
+                numberOfUploads: numberOfUploads,
+                totalSend: totalSend
+            });
+
+            UIFunctionsBinding.Instance.UpdateUploadListUI({
+                list: listUpload,
+                numberOfUploads: numberOfUploads,
+                totalSend: totalSend
             });
         } catch (error) {
             Logger.error(error);

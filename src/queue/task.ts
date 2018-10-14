@@ -6,7 +6,7 @@ export enum PRIORITY_QUEUE {
 };
 
 export class Task {
-    id: number;
+    id: string;
     job: Job<Task>;
     priority: PRIORITY_QUEUE = PRIORITY_QUEUE.MEDIUM;
 }

@@ -1,51 +1,60 @@
 import { Database } from './../persist/Database';
-import { Worker } from "cluster";
 import { Logger } from "../util/Logger";
-import { Shutdown, MessageToWorker, WorkProcess } from "./UtilWorker";
-import { Util } from "../util/Util";
-import { QueueUploader } from "../sync/queue/QueueUploader";
-import { UploaderTask } from "../sync/task/UploaderTask";
-import { File } from "../sync/File";
+import { WorkProcess } from "./UtilWorker";
 import { SyncDataNative } from "../sync/SyncDataNative";
-import { Environment } from "../config/env";
 import { FileTypeAction } from "../sync/task/FileTask";
+import { EntityFolderSync } from '../persist/entities/EntityFolderSync';
+import { SystemWorker } from './SystemWorker';
+import { FunctionsBinding } from '../ipc/FunctionsBinding';
 
-export class WorkerWatcher {
+export interface WhacterFolder {
+    path: string;
+    watcher: SyncDataNative;
+}
+export class WorkerWatcher extends SystemWorker {
     private static _instance: WorkerWatcher;
+    private watchers: WhacterFolder[] = [];
     constructor() {
+        super(WorkProcess.WORKER_WHATCHER);
         Logger.info(`[WorkerWatcher] Worker ${process.pid} start!`);
-
-        process.on('message', (msg) => {
-            switch (msg) {
-                case 'shutdown':
-                    // Stop accepting connections, wait until existing connections close
-                    process.exit(0);
-                    setTimeout(() => {
-                        process.exit(1);
-                    }, 5 * 1e+3)
-                    break;
-                default:
-                    break;
-            }
-        });
     }
 
     public static get Instance(): WorkerWatcher {
         return this._instance || (this._instance = new this());
     }
 
+    StopWhatch(folder) {
+        let item = this.watchers.find(el => el.path === folder);
+        if (item) {
+            item.watcher.Stop();
+        } else {
+            Logger.warn(`Folder ${folder} not found in whatching`);
+        }
+    }
+
+    AddWatch(src) {
+        let sync = new SyncDataNative(src);
+        sync.StartWhatch();
+
+        this.watchers.push({
+            path: src,
+            watcher: sync
+        });
+    }
+
     Init() {
-        process.on('message', this.Listen.bind(this));
-        let sync = new SyncDataNative(Environment.config.synchPath);
-        sync.StartSystem();
+        EntityFolderSync.Instance.ListFolders(async (err, folders) => {
+            if (err) {
+                Logger.error(err);
+                return;
+            }
+            for (let folder of folders) {
+                this.AddWatch(folder);
+            }
+        });
     }
 
     Listen(msg: any) {
-        if (msg === 'shutdown') {
-            Shutdown();
-            return;
-        }
-
         switch (msg.type) {
             case 'DO_UPLOAD':
 
@@ -54,10 +63,19 @@ export class WorkerWatcher {
             case 'DATABASE_RESPONSE':
                 Database.Instance.DbResponse(msg.data);
                 break;
+
+            case 'ADD_WATCH':
+                this.AddWatch(msg.data);
+                break;
+
+            case 'STOP_WATCHER':
+                this.StopWhatch(msg.data);
+                break;
         }
     }
 
-    AddFileTask(type: 'folder' | 'file', key, action: FileTypeAction, oldKey: string = undefined) {
-        MessageToWorker(WorkProcess.WORKER_PROCESS_FILE, { type: 'ADD_FILE', data: { key: key, action: action, item: type, oldKey: oldKey } });
+    AddFileTask(type: 'folder' | 'file', key, action: FileTypeAction, oldKey: string = undefined, rootFolder: string) {
+        // MessageToWorker(WorkProcess.WORKER_PROCESS_FILE, { type: 'ADD_FILE', data: { key: key, action: action, item: type, oldKey: oldKey } });
+        FunctionsBinding.Instance.WatchFileEvent({ key: key, action: action, item: type, oldKey: oldKey, rootFolder: rootFolder});
     }
 }

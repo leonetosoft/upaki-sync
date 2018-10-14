@@ -1,6 +1,5 @@
 import { Util } from "../util/Util";
 import * as fs from 'fs';
-import * as path from 'path';
 import { Logger } from "../util/Logger";
 
 export class File {

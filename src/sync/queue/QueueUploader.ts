@@ -66,7 +66,6 @@ export class QueueUploader {
     }
     addJob(job: UploaderTask) {
         if (!this.isAlreadyUploading(job.file.filePath)) {
-            WorkerUpload.Instance.sendUploadList();
             this.tasks.AddJob(job);
         }
     }

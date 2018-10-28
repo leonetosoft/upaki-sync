@@ -73,7 +73,7 @@ export class WorkerProcessFile extends SystemWorker {
                     if (data.item === 'file') {
                         Logger.debug(`New file renamed ${data.key}`);
                         let fileData = await EntityUpload.Instance.getFile(data.oldKey);
-                        console.log(fileData);
+
                         if (fileData && fileData.state === UploadState.FINISH) {
                             Logger.warn(`File renamed checksum OK, not upload!`);
                         } else {
@@ -116,6 +116,10 @@ export class WorkerProcessFile extends SystemWorker {
             if (element !== null && element !== undefined)
                 QueueFile.Instance.addJob(new FileTask(new File(element, rootFolder), FileTypeAction.ADD));
         });
+    }
+
+    PutFileQueue(file: string, rootFolder: string) {
+        QueueFile.Instance.addJob(new FileTask(new File(file, rootFolder), FileTypeAction.ADD));
     }
 
     /**

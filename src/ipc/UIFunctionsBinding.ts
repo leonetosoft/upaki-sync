@@ -2,6 +2,7 @@ import { SharedFuncion } from "./EventBinding";
 import { WorkProcess } from "../thread/UtilWorker";
 import { UploadList } from "./IPCInterfaces";
 import { WorkerMaster } from "../thread/WorkerMaster";
+import { Environment } from "..";
 
 
 export class UIFunctionsBinding {

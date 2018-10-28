@@ -23,6 +23,15 @@ export class WorkerUpload extends SystemWorker {
     Init() {
         // process.on('message', this.Listen.bind(this));
         QueueUploader.Instance.tasks.Start();
+        this.UpdateUiHandler();
+    }
+
+    UpdateUiHandler() {
+        setInterval(() => {
+            if (QueueUploader.Instance.tasks.getTaskListByPriority().length !== 0) {
+                WorkerUpload.Instance.sendUploadList();
+            }
+        }, 5000);
     }
 
     StartUpload(src, session: S3StreamSessionDetails, rootFolder: string) {

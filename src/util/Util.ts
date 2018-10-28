@@ -69,6 +69,10 @@ export namespace Util {
         return stats.size;
     }
 
+    export function MD5SRC(src) {
+        return crypto.createHash('md5').update(src).digest("hex");
+    }
+
     export function getLastModifies(filename) {
         const stats = fs.statSync(filename);
         const lastModifies = moment(stats.mtime).format('YYYY-MM-DD HH:mm:ss');

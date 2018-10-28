@@ -1,10 +1,19 @@
+import * as cluster from 'cluster';
+import { WorkerMaster } from './WorkerMaster';
+import { IQueuedSender } from '../ipc/QueueSender';
+
 export enum WorkProcess {
     MASTER = 1,
-    WORKER_PROCESS_FILE = 1,
+    WORKER_PROCESS_FILE = 6,
     WORKER_UPLOAD = 2,
     WORKER_SOCKET = 3,
     WORKER_SCAN_PROCESS = 4,
     WORKER_WHATCHER = 5
+}
+
+export namespace ProcesSys {
+    export var processMaster: WorkerMaster;
+    export var sender: IQueuedSender;
 }
 
 export interface IMessageToWorker {
@@ -13,7 +22,11 @@ export interface IMessageToWorker {
 }
 
 export function MessageToWorker(work: WorkProcess, msg: IMessageToWorker) {
-    process.send({ type: 'TO_WORKER', work: work, type_to: msg.type, data: msg.data });
+    if (!cluster.isMaster) {
+        ProcesSys.sender.send({ type: 'TO_WORKER', work: work, type_to: msg.type, data: msg.data });
+    } else {
+        ProcesSys.processMaster.ToWorkerMsg({ work: work, type_to: msg.type, data: msg.data });
+    }
 }
 
 export function Shutdown() {

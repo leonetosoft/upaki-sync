@@ -9,6 +9,11 @@ import { WorkerProcessFile } from "../thread/WorkerProcessFile";
 import { UploadList } from "./IPCInterfaces";
 import { WorkerSocket } from "../thread/WorkerSocket";
 import { FileTypeAction } from "../sync/task/FileTask";
+import * as fs from 'fs';
+import * as readline from 'readline';
+import * as os from 'os';
+import { Util } from "../util/Util";
+import * as path from 'path';
 
 export class FunctionsBinding {
     private static _instance: FunctionsBinding;
@@ -59,6 +64,35 @@ export class FunctionsBinding {
             callback(undefined, '');
         } catch (error) {
             callback('Erro ao inserir arquivo para processamento', undefined);
+            Logger.error(error);
+        }
+    }
+
+    @SharedFuncion({
+        mainWorter: WorkProcess.WORKER_PROCESS_FILE,
+        response: false
+    })
+    ProcessFileLote(rootFolder: string/*, callback: (err, rs) => void*/) {
+        try {
+            let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
+            var instream = fs.createReadStream(source);
+            var rl = readline.createInterface(instream);
+
+            rl.on('line', (line) => {
+                // console.log(line);
+                if (line && line !== '') {
+                    WorkerProcessFile.Instance.PutFileQueue(line, rootFolder);
+                }
+            });
+
+            rl.on('close', () => {
+                try {
+                    fs.unlinkSync(source);
+                } catch (error) {
+                    Logger.error(error);
+                }
+            });
+        } catch (error) {
             Logger.error(error);
         }
     }

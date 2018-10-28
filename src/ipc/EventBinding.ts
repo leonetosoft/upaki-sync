@@ -42,10 +42,10 @@ function logMethod(target, key, descriptor) {
 export function SharedReceiveCall(msg: { args: any[], id: string, key: string, workerRequest: number }) {
     let findFunction = registerFuncions.find(el => el.key === msg.key);
     if (findFunction) {
-        Logger.debug(`Request call ${msg.key} id = ${msg.id}`);
+        // Logger.debug(`Request call ${msg.key} id = ${msg.id}`);
         if (msg.id !== '') {
             msg.args.push((err, rs) => {
-                Logger.debug(`Response OK for request call ${msg.key}`);
+                // Logger.debug(`Response OK for request call ${msg.key}`);
                 MessageToWorker(msg.workerRequest, { type: 'RECEIVE_CALL_RESPONSE', data: { id: msg.id, err: err, rs: rs } });
             });
         }
@@ -60,7 +60,7 @@ export function SharedReceiveCall(msg: { args: any[], id: string, key: string, w
 }
 
 export function SharedResponseCall(msg: { id: string, err: string, rs: any }) {
-    Logger.debug(`Response OK in origin worker`);
+    // Logger.debug(`Response OK in origin worker`);
     callEvents.emit(msg.id, msg.err, msg.rs);
 }
 
@@ -95,7 +95,7 @@ export function SharedFuncion(params: SharedFuncionParameters) {
 
         // return originalMethod;
         // } else {
-
+        let a = this;
         descriptor.value = function () {
             if (!Environment.config) {
                 throw new Error(`Function ${propertyKey} worker not set, please set Environment.config.worker`);

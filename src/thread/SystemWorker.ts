@@ -1,17 +1,19 @@
 //import * as ipc from 'node-ipc';
-import { WorkProcess, Shutdown } from './UtilWorker';
+import { WorkProcess, Shutdown, ProcesSys } from './UtilWorker';
 import { SharedReceiveCall, SharedResponseCall } from '../ipc/EventBinding';
 import { FunctionsBinding } from '../ipc/FunctionsBinding';
 import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
+import { createQueuedSender } from '../ipc/QueueSender';
 
 export interface WorkerListeners {
     Listen: (msg: any) => void;
 }
 
 export class SystemWorker {
-    workerP: WorkProcess
+    workerP: WorkProcess;
     constructor(woker: WorkProcess) {
         this.workerP = woker;
+        ProcesSys.sender = createQueuedSender(<any>process);
         process.on('message', this.DefaultListem.bind(this));
         FunctionsBinding.Instance;
         UIFunctionsBinding.Instance;

@@ -20,7 +20,7 @@ export class EntityUpload {
     private table: string = 'file';
     // private connection: Datastore;
 
-    constructor() {}
+    constructor() { }
 
     public static get Instance(): EntityUpload {
         return this._instance || (this._instance = new this());
@@ -59,8 +59,33 @@ export class EntityUpload {
                 } else {
                     if (row && row.data) {
                         resolve(JSON.parse(row.data));
-                    }else{
+                    } else {
                         resolve(undefined);
+                    }
+                }
+            });
+        })
+    }
+
+    getAnyFiles(paths: string[]): Promise<EntityUploadData[]> {
+        return new Promise<EntityUploadData[]>((resolve, reject) => {
+            let keys = paths.map(el => {
+                return this.MD5SRC(el);
+            });
+            // console.log(keys.join(','));
+            Database.Instance.All(`SELECT key, data FROM ${this.table} WHERE key in(${keys.map(k => { return `'${k}'`; }).join(`,`)})`, [], (err, row) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    /*console.log(row);
+                    console.log(paths);
+                    console.log(keys);*/
+                    if (row.length) {
+                        resolve(row.map(el => {
+                            return JSON.parse(el.data);
+                        }));
+                    } else {
+                        resolve([]);
                     }
                 }
             });
@@ -81,7 +106,7 @@ export class EntityUpload {
                     data.path = newPath;
 
                     Database.Instance.Run(`UPDATE ${this.table} SET key=?, data=? WHERE key = ?`, [newKey, JSON.stringify(data), key], (errInsert) => {
-                        if(errInsert){
+                        if (errInsert) {
                             reject(errInsert);
                             return;
                         }

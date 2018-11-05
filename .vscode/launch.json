@@ -21,6 +21,16 @@
             "protocol": "inspector"
         },
         {
+            "name": "Cluster Test",
+            "type": "node",
+            "request": "launch",
+            "args": ["src/indexClusterV2.ts", "--dev"],
+            "runtimeArgs": ["-r", "ts-node/register"],
+            "cwd": "${workspaceRoot}",
+            "protocol": "inspector",
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
             "name": "Ligar Sincronizador",
             "type": "node",
             "request": "launch",

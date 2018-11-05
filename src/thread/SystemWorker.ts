@@ -11,9 +11,12 @@ export interface WorkerListeners {
 
 export class SystemWorker {
     workerP: WorkProcess;
-    constructor(woker: WorkProcess) {
+    pname: string;
+    constructor(woker: WorkProcess, pname = undefined) {
         this.workerP = woker;
+        this.pname = pname;
         ProcesSys.sender = createQueuedSender(<any>process);
+        ProcesSys.pname = pname;
         process.on('message', this.DefaultListem.bind(this));
         FunctionsBinding.Instance;
         UIFunctionsBinding.Instance;

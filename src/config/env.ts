@@ -29,6 +29,11 @@ export interface Config {
             taskSize: number;
             maxRetries: number;
             retryDelay: number;
+        },
+        downloadTask?: {
+            taskSize: number;
+            maxRetries: number;
+            retryDelay: number;
         }
     },
     socket: {

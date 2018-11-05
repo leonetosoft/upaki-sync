@@ -1,13 +1,14 @@
 import * as cluster from 'cluster';
 import { Worker } from 'cluster';
 import { Logger } from '../util/Logger';
-import { WorkProcess, ProcesSys } from './UtilWorker';
+import { WorkProcess, ProcesSys, ProcessType } from './UtilWorker';
 import * as events from 'events';
 import { UIEvents } from '../ipc/UIEvents';
 import { SharedReceiveCall, SharedResponseCall } from '../ipc/EventBinding';
 import { FunctionsBinding } from '../ipc/FunctionsBinding';
 import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
 import { createQueuedSender, IQueuedSender } from '../ipc/QueueSender';
+import * as uuidv1 from 'uuid/v1';
 // import { UploadList } from '../ipc/IPCInterfaces';
 /*export class testBing implements UIEvents {
     UploadList(list: UploadList) {
@@ -20,6 +21,14 @@ import { createQueuedSender, IQueuedSender } from '../ipc/QueueSender';
         throw new Error("Method not implemented.");
     }
 }*/
+
+export interface WorkerProcess {
+    pname: string;
+    WORKER: Worker;
+    sender?: IQueuedSender;
+    ready?: boolean;
+}
+
 export class WorkerMaster {
     private static _instance: WorkerMaster;
     WORKER_SOCKET: Worker;
@@ -37,6 +46,8 @@ export class WorkerMaster {
     events: events.EventEmitter;
     implUi: UIEvents[] = [];
 
+    PROCESS_LIST: WorkerProcess[] = [];
+
 
     constructor() {
         this.events = new events.EventEmitter();
@@ -50,6 +61,27 @@ export class WorkerMaster {
 
     public RegisterUI(ui: UIEvents) {
         this.implUi.push(ui);
+    }
+
+    public forkProcess(ptype: ProcessType, pname = uuidv1()) {
+        var new_worker_env = {};
+        new_worker_env["PNAME"] = pname;
+        new_worker_env["PTYPE"] = ptype;
+
+        let proc: WorkerProcess = {
+            pname: pname,
+            WORKER: cluster.fork(new_worker_env),
+            ready: false
+        };
+
+        this.PROCESS_LIST.push(proc);
+
+        proc.sender = createQueuedSender(<any>proc.WORKER);
+
+        proc.WORKER.on('message', this.Listen.bind(this));
+        proc.WORKER.on('online', () => {
+            proc.ready = true;
+        });
     }
 
     Init() {

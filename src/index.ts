@@ -27,8 +27,8 @@ export * from './persist/entities/EntityUpload';
 import { Environment, Config } from './config/env';
 import * as cluster from 'cluster';
 import { PrintCredits } from './credits';
-import { WorkProcess } from './thread/UtilWorker';
-import { WorkerMaster/*, testBing */} from './thread/WorkerMaster';
+import { WorkProcess, ProcessType } from './thread/UtilWorker';
+import { WorkerMaster/*, testBing */ } from './thread/WorkerMaster';
 import { Database } from './persist/Database';
 import { WorkerProcessFile } from './thread/WorkerProcessFile';
 import { WorkerUpload } from './thread/WorkerUpload';
@@ -37,6 +37,7 @@ import { WorkerScanProcess } from './thread/WorkerScanProcess';
 import { WorkerWatcher } from './thread/WorkerWatcher';
 import { Logger } from './util/Logger';
 import { EntityFolderSync } from './persist/entities/EntityFolderSync';
+import { WorkerDownload } from './thread/WorkerDownload';
 
 export function BootSync(config: Config) {
     Environment.config = config;
@@ -46,8 +47,19 @@ export function BootSync(config: Config) {
         Environment.config.worker = WorkProcess.MASTER;
         Database.Instance.setMaster();
         WorkerMaster.Instance.Init();
+        WorkerMaster.Instance.forkProcess(ProcessType.DOWNLOAD, 'test_proc');
         // WorkerMaster.Instance.RegisterUI(new testBing());
     } else if (cluster.isWorker) {
+        if (process.env['PNAME'] && process.env['PTYPE']) {
+            let type = Number(process.env['PTYPE']) as ProcessType;
+
+            switch (type) {
+                case ProcessType.DOWNLOAD:
+                    Database.Instance.setMaster();
+                    WorkerDownload.Instance.initScan();
+                    break;
+            }
+        }
         process.once('message', (msg) => {
             if (msg.type === 'CONFIG_WORKER') {
                 switch (msg.work) {

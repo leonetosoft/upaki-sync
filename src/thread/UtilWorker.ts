@@ -8,12 +8,26 @@ export enum WorkProcess {
     WORKER_UPLOAD = 2,
     WORKER_SOCKET = 3,
     WORKER_SCAN_PROCESS = 4,
-    WORKER_WHATCHER = 5
+    WORKER_WHATCHER = 5,
+    WORKER_DOWNLOAD = ''
+}
+
+export enum ProcessType {
+    DOWNLOAD = 1
+}
+
+export enum ProcTaskState {
+    CREATED = 0,
+    STOPPED = 1,
+    STARTED = 2,
+    ERROR = 3,
+    COMPLETED = 4
 }
 
 export namespace ProcesSys {
     export var processMaster: WorkerMaster;
     export var sender: IQueuedSender;
+    export var pname: string;
 }
 
 export interface IMessageToWorker {

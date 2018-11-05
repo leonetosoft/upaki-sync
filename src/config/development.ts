@@ -34,6 +34,11 @@ export var development: Config = {
             taskSize: 1,
             maxRetries: 10,
             retryDelay: 30000
+        },
+        downloadTask: {
+            taskSize: 1,
+            maxRetries: 10,
+            retryDelay: 30000
         }
     },
     socket: {

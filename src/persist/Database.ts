@@ -24,6 +24,7 @@ export class Database {
     private workerMain: WorkProcess = WorkProcess.WORKER_SCAN_PROCESS;
     constructor() {
         this.events = new events.EventEmitter();
+        this.setMaster();
     }
     public static get Instance(): Database {
         return this._instance || (this._instance = new this());
@@ -38,6 +39,13 @@ export class Database {
         this.connection.run(`CREATE TABLE IF NOT EXISTS file (key NOT NULL, data TEXT, PRIMARY KEY ("key"))`, () => { });
         this.connection.run(`CREATE TABLE IF NOT EXISTS folder (key NOT NULL, data TEXT,  PRIMARY KEY ("key"))`, () => { });
         this.connection.run(`CREATE TABLE IF NOT EXISTS sync_folder (folder NOT NULL, PRIMARY KEY ("folder"))`, () => { });
+        this.connection.run(`CREATE TABLE task (pname TEXT NOT NULL, ptype INTEGER NOT NULL, pdata text, pstate INTEGER DEFAULT 0 NOT NULL, pdesc TEXT, PRIMARY KEY ("pname"))`, () => { });
+        this.connection.run(`CREATE TABLE credential (
+            device_id text NOT NULL,
+            credential_key text,
+            token text,
+            PRIMARY KEY ("device_id")
+        );`, () => { });
     }
 
     public Run(sql: string, params: any[], callback?: (err: Error | null) => void) {

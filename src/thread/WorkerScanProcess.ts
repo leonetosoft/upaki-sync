@@ -18,7 +18,7 @@ export interface ScanTasks {
     path: string;
     stop: boolean;
 }
-export class WorkerScanProcess extends SystemWorker {
+export class WorkerScanProcess extends SystemWorker<any> {
     scannerDir = new events.EventEmitter();
     finishedScan = false;
     scanTasks: ScanTasks[] = [];
@@ -84,8 +84,18 @@ export class WorkerScanProcess extends SystemWorker {
                 Logger.error(err);
                 return;
             }
-            for (let foder of folders) {
-                await this.ScanDir(foder);
+            for (let folder of folders) {
+                if(!fs.existsSync(folder)){
+                    EntityFolderSync.Instance.DeleteFolder(folder, (err) => {
+                        if(err)
+                        Logger.error(err);
+
+                        Logger.warn(`Folder realtime sinch removed, folder not exists ${folder}`);
+                    });
+                    return;
+                }
+                
+                await this.ScanDir(folder);
             }
         });
     }

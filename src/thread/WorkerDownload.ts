@@ -1,6 +1,6 @@
 import { SystemWorker } from "./SystemWorker";
 import { WorkProcess, ProcTaskState } from "./UtilWorker";
-import { TaskModel, EntityTask } from "../persist/entities/EntityTask";
+import { EntityTask } from "../persist/entities/EntityTask";
 import { Logger } from "../util/Logger";
 import { Upaki } from "upaki-cli";
 import { Environment } from "../config/env";
@@ -10,13 +10,22 @@ export enum DownloadFileState {
     AWAIT = 1,
     DOWNLOADING = 2,
     COMPLETED = 3,
-    ERROR = 4
+    REQUEST_PAUSE = 5,
+    REQUEST_STOP = 7,
+    PAUSE = 6,
+    ERROR = 4,
+    STOP = 8
+}
+
+export enum DownloadUiAction {
+    STOP = 1,
+    PAUSE = 2
 }
 
 export interface PendingFolder {
     id: string;
     name: string;
-    dad: string;
+    dad?: string;
 }
 
 export interface PendingFile {
@@ -28,6 +37,10 @@ export interface PendingFile {
     info?: string;
     etag?: string;
     path?: string;
+    receivedBytes?: number;
+    downloadSpeed?: string;
+    downloadTime?: string;
+    queueId?: string;
 }
 
 export interface DownloadProcData {
@@ -43,12 +56,22 @@ export interface DownloadProcData {
 export enum ScanDownloadState {
     SCAN = 1,
     AWAIT_NEXT = 2,
-    COMPLETE_SCAN = 3
+    COMPLETE_SCAN = 3,
+    COMPLETE_DOWNLOAD = 4,
+    CREATED = 5
 }
 
-export class WorkerDownload extends SystemWorker {
+export interface DownloadInfoUi {
+    downloadList: PendingFile[];
+    folder: string;
+    state: ScanDownloadState;
+    await: number;
+    concluded: number;
+    errors: number;
+}
+
+export class WorkerDownload extends SystemWorker<DownloadProcData> {
     private static _instance: WorkerDownload;
-    private model: TaskModel<DownloadProcData>;
     private upaki: Upaki;
 
     constructor() {
@@ -59,8 +82,41 @@ export class WorkerDownload extends SystemWorker {
         this.model = await EntityTask.Instance.getTask<DownloadProcData>(this.pname);
     }
 
-    async SaveData() {
-        await EntityTask.Instance.UpdateData(this.model);
+    UpdateUiHandler() {
+        setInterval(async () => {
+            this.SaveData();
+        }, 1000);
+    }
+
+    uiAction(queueId: string, action: DownloadUiAction, callback: (err, rs) => void) {
+        let task = QueueDownload.Instance.tasks.getTaskById(queueId);
+        if (!task) {
+            callback('Processo nao encontrado', undefined);
+        } else {
+
+            if (action === DownloadUiAction.PAUSE) {
+                if (task.task.fileDownload.state === DownloadFileState.PAUSE) {
+                    task.task.Continue();
+
+                    task.task.events.once('onContinue', (err) => {
+                        callback(err ? 'Erro ao continuar' : undefined, undefined);
+                    });
+                } else {
+                    task.task.Pause();
+
+                    task.task.events.once('onPause', (err) => {
+                        callback(err ? 'Erro ao pausar' : undefined, undefined);
+                    });
+                }
+            }else {
+                task.task.Stop();
+
+                task.task.events.once('onStop', (err) => {
+                    callback(err ? 'Erro ao remover' : undefined, undefined);
+                });
+            }
+
+        }
     }
 
     async initScan() {
@@ -71,7 +127,7 @@ export class WorkerDownload extends SystemWorker {
                 this.pData.state = ScanDownloadState.AWAIT_NEXT;
             }
 
-            console.log(this.model);
+            this.UpdateUiHandler();
             this.LoadFiles();
         } catch (error) {
             Logger.error(error);
@@ -96,15 +152,26 @@ export class WorkerDownload extends SystemWorker {
     }
 
     processQueue() {
-        for (let down of this.pData.pendingFiles.filter(el => el.state !== DownloadFileState.COMPLETED)) {
+        let dataProcess = this.pData.pendingFiles.filter(el => el.state !== DownloadFileState.COMPLETED &&
+             el.state !== DownloadFileState.ERROR && el.state !== DownloadFileState.STOP);
+
+        for (let down of dataProcess) {
             QueueDownload.Instance.addJob(new DownloadTask(down, this.pData.destFolder));
+        }
+
+        if (dataProcess.length === 0) {
+            Logger.debug(`Complete task download ${this.pname}`);
+            this.pData.state = ScanDownloadState.COMPLETE_DOWNLOAD;
+            this.SaveData();
+            this.model.pstate = ProcTaskState.COMPLETED;
         }
     }
 
     private AwaitNext() {
         this.SaveData();
 
-        if (this.pData.pendingFiles.filter(el => el.state !== DownloadFileState.COMPLETED).length === 0) {
+        if (this.pData.pendingFiles.filter(el => (el.state !== DownloadFileState.COMPLETED &&
+            el.state !== DownloadFileState.ERROR && el.state !== DownloadFileState.STOP)).length === 0) {
             Logger.warn(`No files in folder, force next step ...`);
             this.LoadFiles();
         } else {
@@ -120,6 +187,18 @@ export class WorkerDownload extends SystemWorker {
             return this.getPathOfFolder(findDad, path)
         } else {
             return path;
+        }
+    }
+
+    async CompleteDownloadTask() {
+        await this.LoadFiles();
+        let findAwait = this.pData.pendingFiles.find(el => el.state === DownloadFileState.AWAIT);
+
+        if (!findAwait) {
+            Logger.debug(`Complete task download ${this.pname}`);
+            this.pData.state = ScanDownloadState.COMPLETE_DOWNLOAD;
+            this.model.pstate = ProcTaskState.COMPLETED;
+
         }
     }
 
@@ -176,12 +255,12 @@ export class WorkerDownload extends SystemWorker {
                     this.pData.actualFolder = undefined;
                     this.OnCompleteScanFolder();
                 }
-                console.log('ActualFolder:');
+                /*console.log('ActualFolder:');
                 console.log(this.pData.actualFolder);
                 console.log('PedingFolders');
                 console.log(this.pData.pendingFolders);
                 console.log('PendingFiles');
-                console.log(this.pData.pendingFiles);
+                console.log(this.pData.pendingFiles);*/
                 return;
             }
             let pendingFolders = fileList.data.list.filter(el => el.isFolder);
@@ -209,10 +288,6 @@ export class WorkerDownload extends SystemWorker {
             for (let pFolders of this.pData.pendingFolders) {
                 this.pData.path.push(pFolders);
             }
-            console.log(this.pData.path);
-            //console.log(this.pData.path);
-
-            //console.log(this.pData.pendingFolders);
             this.LoadFiles(fileList.data.next);
 
         } catch (error) {

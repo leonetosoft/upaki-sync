@@ -11,7 +11,7 @@ export interface WhacterFolder {
     path: string;
     watcher: SyncDataNative;
 }
-export class WorkerWatcher extends SystemWorker {
+export class WorkerWatcher extends SystemWorker<any> {
     private static _instance: WorkerWatcher;
     private watchers: WhacterFolder[] = [];
     constructor() {

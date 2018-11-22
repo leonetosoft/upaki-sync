@@ -1,15 +1,15 @@
 import { Config } from "./env";
 
 export var production: Config = {
-    version: '1.2.0',
-    synchPath: "",
+    version: '1.0.0',
     useCluster: true,
-    credentialsPath: "",
+    synchPath: "C:\\Users\\Leonardo\\Upaki"/*"E:\\"*/,
+    credentialsPath: "C:\\Users\\Leonardo\\XdqL09gy83.apikey.json",
     logging: {
         type: ['console', 'file', 'sentry'],
         warn: true,
         info: true,
-        dbug: false,
+        dbug: true,
         error: true
     },
     credentials: {
@@ -17,7 +17,7 @@ export var production: Config = {
         credentialKey: ""
     },
     database: {
-        filedb: './data/files.db',
+        filedb: '.\\data\\sync.db',
     },
     queue: {
         uploader: {
@@ -26,7 +26,7 @@ export var production: Config = {
             retryDelay: 30000
         },
         fileAction: {
-            taskSize: 10,
+            taskSize: 100,
             maxRetries: 10,
             retryDelay: (30000)
         },
@@ -40,7 +40,8 @@ export var production: Config = {
             maxRetries: 10,
             retryDelay: 30000
         }
-    }, socket: {
+    },
+    socket: {
         url: 'https://www.upaki.com.br'
     }
 }

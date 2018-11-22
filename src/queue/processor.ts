@@ -74,6 +74,10 @@ export class Processor<T extends Task> {
         return this.taskListHigh.length === 0 && this.taskListMedium.length === 0 && this.taskListLow.length === 0;
     }
 
+    getTaskById(id): Job<T> {
+        return this.getTaskListByPriority().find(t => t.id === id);
+    }
+
     LoopFunction() {
         try {
             let jobs = this.DeQueue(); // Coleto as tarefas

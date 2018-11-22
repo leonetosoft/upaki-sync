@@ -3,7 +3,7 @@ import { WorkProcess } from "./UtilWorker";
 import { SocketClient } from "../socket/SocketClient";
 import { SystemWorker } from './SystemWorker';
 
-export class WorkerSocket extends SystemWorker {
+export class WorkerSocket extends SystemWorker<any> {
   UPLOAD_LIST = [];
   SIZE_SEND = 0;
   TOTAL_SEND = 0;

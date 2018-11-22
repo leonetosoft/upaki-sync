@@ -5,6 +5,8 @@ import * as os from 'os';
 import * as path from 'path';
 import { PRIORITY_QUEUE } from '../queue/task';
 import { UploaderTask } from '../sync/task/UploaderTask';
+import { Environment } from '../config/env';
+import { Upaki, UpakiArchiveList } from 'upaki-cli';
 
 export namespace Util {
     /**
@@ -47,21 +49,21 @@ export namespace Util {
    */
     export function mkdirSyncRecursive(dir) {
         path
-        .resolve(dir)
-        .split(path.sep)
-        .reduce((acc, cur) => {
-            const currentPath = path.normalize(acc + path.sep + cur);
-            try {
-                fs.statSync(currentPath);
-            } catch (e) {
-                if (e.code === 'ENOENT') {
-                    fs.mkdirSync(currentPath);
-                } else {
-                    throw e;
+            .resolve(dir)
+            .split(path.sep)
+            .reduce((acc, cur) => {
+                const currentPath = path.normalize(acc + path.sep + cur);
+                try {
+                    fs.statSync(currentPath);
+                } catch (e) {
+                    if (e.code === 'ENOENT') {
+                        fs.mkdirSync(currentPath);
+                    } else {
+                        throw e;
+                    }
                 }
-            }
-            return currentPath;
-        }, '');
+                return currentPath;
+            }, '');
     }
 
     export function getFileSize(path: string) {
@@ -108,6 +110,71 @@ export namespace Util {
             task.priority = PRIORITY_QUEUE.LOW;
         }
         return task;
+    }
+
+    export async function ListCloudFiles(folderId = undefined, next: string = undefined): Promise<UpakiArchiveList> {
+        let upakiClient = new Upaki(Environment.config.credentials);
+        let list = await upakiClient.getFiles(folderId, next);
+        return list.data;
+    }
+
+    export function WriteCache(cacheName, data, callback: (err: NodeJS.ErrnoException, cacheSource: string) => void) {
+        let source = path.join(os.tmpdir(), 'upaki-cache');
+
+        if (!fs.existsSync(source)) {
+            fs.mkdirSync(source);
+        }
+
+        source = path.join(source, cacheName);
+
+        fs.writeFile(source, data, 'utf-8', (err) => {
+            callback(err, source);
+        });
+    }
+
+    export function WriteTaskData(cacheName, data, callback: (err: NodeJS.ErrnoException, cacheSource: string) => void) {
+        let source = path.join(getTaskStoreSource());
+        if (!fs.existsSync(source)) {
+            fs.mkdirSync(source);
+        }
+        
+        source = path.join(source, cacheName);
+
+        fs.writeFile(source, JSON.stringify(data), 'utf-8', (err) => {
+            callback(err, source);
+        });
+    }
+
+    export function getUpakiFolder() {
+        return `upaki`;
+    }
+
+    export function getTaskStoreSource() {
+        return path.join(getAppData(), getUpakiFolder(), 'tasks');
+    }
+
+    export function getAppData() {
+        return process.env.APPDATA || (process.platform == 'darwin' ? process.env.HOME + 'Library/Preferences' : '/var/local');
+    }
+
+    export function ReadTaskData<T>(taskName, callback: (err: NodeJS.ErrnoException, cacheSource: T, source) => void) {
+        let source = path.join(getTaskStoreSource(), taskName);
+        fs.readFile(source, 'utf8', (err, data) => {
+            if (err) {
+                callback(err, undefined, source);
+                return;
+            }
+            try {
+                callback(undefined, JSON.parse(data), source);
+            } catch (error) {
+                callback(error, undefined, source);
+            }
+        });
+    }
+
+    export function DumpTaskData(taskName, callback: (err: NodeJS.ErrnoException) => void) {
+        let source = path.join(getTaskStoreSource(), taskName);
+        fs.unlink(source, callback);
     }
 
     export function getAbsolutePath(folderPath, rootFolder, baseFolder = os.hostname()) {

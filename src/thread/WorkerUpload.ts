@@ -9,7 +9,7 @@ import { S3StreamSessionDetails } from "upaki-cli";
 import { FunctionsBinding } from "../ipc/FunctionsBinding";
 import { UIFunctionsBinding } from "../ipc/UIFunctionsBinding";
 
-export class WorkerUpload extends SystemWorker {
+export class WorkerUpload extends SystemWorker<any> {
     private static _instance: WorkerUpload;
     constructor() {
         super(WorkProcess.WORKER_UPLOAD);

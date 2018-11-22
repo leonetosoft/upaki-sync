@@ -18,11 +18,14 @@ export * from './thread/WorkerSocket';
 export * from './thread/WorkerScanProcess';
 export * from './thread/WorkerWatcher';
 export * from './util/Logger';
+export * from './util/Util';
 
 export * from './persist/Database';
 export * from './persist/entities/EntityFolderMap';
 export * from './persist/entities/EntityFolderSync';
 export * from './persist/entities/EntityUpload';
+export * from './persist/entities/EntityTask';
+export * from './persist/entities/EntityCredentials';
 
 import { Environment, Config } from './config/env';
 import * as cluster from 'cluster';
@@ -36,18 +39,28 @@ import { WorkerSocket } from './thread/WorkerSocket';
 import { WorkerScanProcess } from './thread/WorkerScanProcess';
 import { WorkerWatcher } from './thread/WorkerWatcher';
 import { Logger } from './util/Logger';
-import { EntityFolderSync } from './persist/entities/EntityFolderSync';
 import { WorkerDownload } from './thread/WorkerDownload';
 
-export function BootSync(config: Config) {
+export function BootSync(config: Config, onInit?: () => void) {
     Environment.config = config;
 
     if (cluster.isMaster) {
         PrintCredits();
         Environment.config.worker = WorkProcess.MASTER;
-        Database.Instance.setMaster();
-        WorkerMaster.Instance.Init();
-        WorkerMaster.Instance.forkProcess(ProcessType.DOWNLOAD, 'test_proc');
+        // Database.Instance.setMaster();
+        if (Environment.config.credentials && Environment.config.credentials.credentialKey && Environment.config.credentials.secretToken) {
+            WorkerMaster.Instance.Init(onInit);
+        }
+
+        /* WorkerMaster.Instance.CreateDownloadTask([{
+             id: 'wBgqk01NYe',
+             name: 'TES_PAUSE_START'
+         }], 'test-download', 'C:\\Download2').then(rs => {
+ 
+         });
+ 
+         WorkerMaster.Instance.StartTask('test');*/
+        // TestDownloadTask();
         // WorkerMaster.Instance.RegisterUI(new testBing());
     } else if (cluster.isWorker) {
         if (process.env['PNAME'] && process.env['PTYPE']) {
@@ -55,7 +68,7 @@ export function BootSync(config: Config) {
 
             switch (type) {
                 case ProcessType.DOWNLOAD:
-                    Database.Instance.setMaster();
+                    //Database.Instance.setMaster();
                     WorkerDownload.Instance.initScan();
                     break;
             }
@@ -64,12 +77,12 @@ export function BootSync(config: Config) {
             if (msg.type === 'CONFIG_WORKER') {
                 switch (msg.work) {
                     case WorkProcess.WORKER_PROCESS_FILE:
-                        Database.Instance.setMaster();
+                        //Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_PROCESS_FILE;
                         WorkerProcessFile.Instance.Init();
                         break;
                     case WorkProcess.WORKER_UPLOAD:
-                        Database.Instance.setMaster();
+                        //Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_UPLOAD;
                         WorkerUpload.Instance.Init();
                         break;
@@ -78,14 +91,14 @@ export function BootSync(config: Config) {
                         WorkerSocket.Instance.Init();
                         break;
                     case WorkProcess.WORKER_SCAN_PROCESS:
-                        Database.Instance.setMaster();
+                        //Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_SCAN_PROCESS;
                         WorkerScanProcess.Instance.InitSync();
                         /*let scan = new WorkerScanProcess(Environment.config.synchPath);
                         scan.InitSync();*/
                         break;
                     case WorkProcess.WORKER_WHATCHER:
-                        Database.Instance.setMaster();
+                        //Database.Instance.setMaster();
                         Environment.config.worker = WorkProcess.WORKER_WHATCHER;
                         WorkerWatcher.Instance.Init();
                         break;

@@ -3,6 +3,7 @@ import { WorkProcess } from "../thread/UtilWorker";
 import { UploadList } from "./IPCInterfaces";
 import { WorkerMaster } from "../thread/WorkerMaster";
 import { Environment } from "..";
+import { DownloadInfoUi } from "../thread/WorkerDownload";
 
 
 export class UIFunctionsBinding {
@@ -39,6 +40,16 @@ export class UIFunctionsBinding {
     FinishScan(src: string) {
         WorkerMaster.Instance.implUi.forEach((el) => {
             el.FinishScan(src);
+        });
+    }
+
+    @SharedFuncion({
+        mainWorter: WorkProcess.MASTER,
+        response: false
+    })
+    UpdateTaskDefinition(taskId: string, cacheSource: string) {
+        WorkerMaster.Instance.implUi.forEach((el) => {
+            el.UpdateTaskDefinition(taskId, cacheSource);
         });
     }
 

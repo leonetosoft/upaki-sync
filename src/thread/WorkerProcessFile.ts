@@ -12,7 +12,7 @@ import { WorkProcess } from "./UtilWorker";
 import { SystemWorker } from "./SystemWorker";
 import { FunctionsBinding } from "../ipc/FunctionsBinding";
 
-export class WorkerProcessFile extends SystemWorker {
+export class WorkerProcessFile extends SystemWorker<any> {
     private static _instance: WorkerProcessFile;
     constructor() {
         super(WorkProcess.WORKER_PROCESS_FILE);

@@ -14,6 +14,7 @@ import * as readline from 'readline';
 import * as os from 'os';
 import { Util } from "../util/Util";
 import * as path from 'path';
+import { DownloadUiAction, WorkerDownload } from "../thread/WorkerDownload";
 
 export class FunctionsBinding {
     private static _instance: FunctionsBinding;
@@ -75,6 +76,10 @@ export class FunctionsBinding {
     ProcessFileLote(rootFolder: string/*, callback: (err, rs) => void*/) {
         try {
             let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
+            if (!fs.existsSync(source)) {
+                Logger.warn(`File ${source} not exists in loc !!! realtime sinc not upload ...`);
+                return;
+            }
             var instream = fs.createReadStream(source);
             var rl = readline.createInterface(instream);
 
@@ -147,6 +152,18 @@ export class FunctionsBinding {
     })
     WatchFileEvent(data: { key: string, action: FileTypeAction, item: 'folder' | 'file', oldKey: string, rootFolder: string }) {
         WorkerProcessFile.Instance.ProcessFileWhatched(data);
+    }
+
+    @SharedFuncion({
+        mainWorter: WorkProcess.WORKER_UPLOAD,
+        response: false
+    })
+    DownloadAction(taskId: string, queueId: string, action: DownloadUiAction, callback: (err, rs) => void) {
+        try {
+            WorkerDownload.Instance.uiAction(queueId, action, callback);
+        } catch (error) {
+            Logger.error(error);
+        }
     }
 
 }

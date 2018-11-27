@@ -1,8 +1,9 @@
 import { Environment } from '../config/env';
-import { WorkProcess, MessageToWorker } from '../thread/UtilWorker';
+import { MessageToWorker } from '../thread/UtilWorker';
 import * as uuidv1 from 'uuid/v1';
 import * as events from 'events';
 import { Logger } from '../util/Logger';
+import { WorkProcess } from '../api/thread';
 
 export interface CallFunc {
     key: string;

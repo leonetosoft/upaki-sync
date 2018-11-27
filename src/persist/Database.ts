@@ -1,4 +1,3 @@
-import { WorkProcess } from './../thread/UtilWorker';
 import { Environment } from '../config/env';
 import { Logger } from '../util/Logger';
 import * as sqlite3 from 'sqlite3';
@@ -8,6 +7,8 @@ import { Util } from '../util/Util';
 import { MessageToWorker } from '../thread/UtilWorker';
 import * as uuidv1 from 'uuid/v1';
 import * as events from 'events';
+import { getSqlsStart } from './dbstart';
+import { WorkProcess } from '../api/thread';
 
 export enum TYPE_DB_EXECUTIONM {
     GET = 'GET',
@@ -35,8 +36,25 @@ export class Database {
         this.Connect();
     }
 
-    private CreateTable() {
-        this.connection.run(`CREATE TABLE IF NOT EXISTS file (key NOT NULL, data TEXT, PRIMARY KEY ("key"))`, () => { });
+    private CreationStartProm(sql: string) {
+        return new Promise((resolve, reject) => {
+            this.connection.run(sql, (rs, err) => {
+                if(err) {
+                    Logger.error(sql);
+                    Logger.error(err);
+                    reject(err);
+                }else{
+                    resolve();
+                }
+            });
+        });
+    }
+
+     InitDatabase() {
+        return Promise.all(getSqlsStart().map(sql => {
+            return this.CreationStartProm(sql);
+        }));
+       /* this.connection.run(`CREATE TABLE IF NOT EXISTS file (key NOT NULL, data TEXT, PRIMARY KEY ("key"))`, () => { });
         this.connection.run(`CREATE TABLE IF NOT EXISTS folder (key NOT NULL, data TEXT,  PRIMARY KEY ("key"))`, () => { });
         this.connection.run(`CREATE TABLE IF NOT EXISTS sync_folder (folder NOT NULL, PRIMARY KEY ("folder"))`, () => { });
         this.connection.run(`CREATE TABLE task (pname TEXT NOT NULL, ptype INTEGER NOT NULL, pdata text, pstate INTEGER DEFAULT 0 NOT NULL, pdesc TEXT, PRIMARY KEY ("pname"))`, () => { });
@@ -45,7 +63,7 @@ export class Database {
             credential_key text,
             token text,
             PRIMARY KEY ("device_id")
-        );`, () => { });
+        );`, () => { });*/
     }
 
     public Run(sql: string, params: any[], callback?: (err: Error | null) => void) {
@@ -154,13 +172,13 @@ export class Database {
     private Connect() {
         try {
             // cria o diretorio caso nao exista
-            if (!fs.existsSync(Util.getPathNameFromFile(Environment.config.database.filedb))) {
-                mkdirp.sync(Util.getPathNameFromFile(Environment.config.database.filedb));
+            if (!fs.existsSync(Util.getDbSource())) {
+                mkdirp.sync(Util.getDbSource());
             }
             let sqlVerb = sqlite3.verbose();
-            Logger.debug(`SQLITE load db file=${Environment.config.database.filedb}`);
-            this.connection = new sqlVerb.Database(Environment.config.database.filedb);
-            this.CreateTable();
+            Logger.debug(`SQLITE load db file=${Util.getDbSource('sync.db')}`);
+            this.connection = new sqlVerb.Database(Util.getDbSource('sync.db'));
+            // this.CreateTable();
 
         } catch (error) {
             console.log(error);

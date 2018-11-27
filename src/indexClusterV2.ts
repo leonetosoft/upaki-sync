@@ -1,15 +1,12 @@
-import { Database } from './persist/Database';
-import { WorkProcess } from './thread/UtilWorker';
-import { SocketClient } from './socket/SocketClient';
-import { production } from './config/production';
 import { development } from './config/development';
 import "reflect-metadata";
 import { Environment } from './config/env';
 import * as fs from 'fs';
 import { BootSync } from './index';
+import { EntityCredentials } from './persist/entities/EntityCredentials';
 
 
-let arg = 0;
+/*let arg = 0;
 if (process.argv.length === 3) {
     arg = 2;
 } else {
@@ -33,9 +30,20 @@ if (!Environment.config.credentials ||
     Environment.config.credentials.credentialKey === '') {
     let credentialsLoad = fs.readFileSync(Environment.config.credentialsPath, 'utf8');
     Environment.config.credentials = JSON.parse(credentialsLoad);
-}
+}*/
+Environment.config = development;
+EntityCredentials.Instance.RestoreCredentialsFromDb().then(rs => {
+    BootSync(Environment.config, (err) => {
+        if (err) {
+            console.log('Errors to start workers!');
+        } else {
+            console.log('Inicializou os trabalhadores com sucesso');
+        }
+    });
+}).catch(err => {
+    console.log('erro na inicializacao');
+})
 
-BootSync(Environment.config);
 
 
 

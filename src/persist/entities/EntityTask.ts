@@ -1,16 +1,10 @@
 import { Database } from "../Database";
-import { ProcessType, ProcTaskState } from "../../thread/UtilWorker";
 import { Util } from "../../util/Util";
 import { Logger } from "../../util/Logger";
 import { UIFunctionsBinding } from "../../ipc/UIFunctionsBinding";
+import { TaskModel, ProcessType } from "../../api/thread";
+import { Environment } from "../../config/env";
 
-export interface TaskModel<T> {
-    pname?: string;
-    pdesc: string;
-    pstate: ProcTaskState;
-    ptype: ProcessType;
-    pdata: T;
-}
 export class EntityTask {
     private static _instance: EntityTask;
 
@@ -21,7 +15,7 @@ export class EntityTask {
 
     UpdateData<T>(task: TaskModel<T>) {
         return new Promise<number>((resolve, reject) => {
-            Database.Instance.Get(`SELECT pstate FROM task WHERE pname=?`, [task.pname], (err, row) => {
+            Database.Instance.Get(`SELECT pstate FROM task WHERE pname=? and user_id=?`, [task.pname, Environment.config.credentials.userId], (err, row) => {
                 if (err) {
                     reject(err);
                     return;
@@ -32,15 +26,20 @@ export class EntityTask {
                         if (errTaskData) {
                             reject(errTaskData);
                         } else {
-                            Database.Instance.Run(`UPDATE task SET pdata=?, pstate=?, ptype=?, pdesc=? WHERE pname = ?`, [source, task.pstate, task.ptype, task.pdesc, task.pname], (errInsert) => {
+                            Database.Instance.Run(`UPDATE task SET pdata=?, pstate=?, ptype=?, pdesc=? WHERE pname = ? and user_id=?`, [source, task.pstate, task.ptype, task.pdesc, task.pname, Environment.config.credentials.userId], (errInsert) => {
                                 if (errInsert) {
                                     reject(errInsert);
                                     return;
                                 }
                                 resolve(1);
                             });
-
-                            UIFunctionsBinding.Instance.UpdateTaskDefinition(task.pname, source);
+                            UIFunctionsBinding.Instance.UpdateTaskDefinition({
+                                pname: task.pname,
+                                pstate: task.pstate,
+                                pdesc: task.pdesc,
+                                ptype: task.ptype,
+                                pdata: undefined
+                            }, source);
                         }
                     });
 
@@ -56,14 +55,20 @@ export class EntityTask {
                         if (errTaskData) {
                             reject(errTaskData);
                         } else {
-                            Database.Instance.Run(`INSERT INTO task(pname, pdata, pstate, ptype, pdesc) VALUES(?,?,?,?,?)`, [task.pname, /*JSON.stringify(task.pdata)*/source, task.pstate, task.ptype, task.pdesc], (errInsert) => {
+                            Database.Instance.Run(`INSERT INTO task(pname, pdata, pstate, ptype, pdesc, user_id) VALUES(?,?,?,?,?,?)`, [task.pname, /*JSON.stringify(task.pdata)*/source, task.pstate, task.ptype, task.pdesc, Environment.config.credentials.userId], (errInsert) => {
                                 if (errInsert) {
                                     reject(errInsert);
                                     return;
                                 }
                                 resolve(1);
                             });
-                            UIFunctionsBinding.Instance.UpdateTaskDefinition(task.pname, source);
+                            UIFunctionsBinding.Instance.UpdateTaskDefinition({
+                                pname: task.pname,
+                                pstate: task.pstate,
+                                pdesc: task.pdesc,
+                                ptype: task.ptype,
+                                pdata: undefined
+                            }, source);
                         }
                     });
 
@@ -74,7 +79,7 @@ export class EntityTask {
 
     ListTasksOfType<T>(ptype: ProcessType): Promise<TaskModel<T>[]> {
         return new Promise((resolve, reject) => {
-            Database.Instance.All(`SELECT pname, pdata, pstate, ptype, pdesc FROM task WHERE ptype=?`, [ptype], (err, rows: TaskModel<any>[]) => {
+            Database.Instance.All(`SELECT pname, pdata, pstate, ptype, pdesc FROM task WHERE ptype=? and user_id=?`, [ptype, Environment.config.credentials.userId], (err, rows: TaskModel<any>[]) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -84,7 +89,7 @@ export class EntityTask {
                                 if (errReadTask) {
                                     Logger.error(errReadTask);
                                 } else {
-                                    UIFunctionsBinding.Instance.UpdateTaskDefinition(row.pname, cacheSource);
+                                    UIFunctionsBinding.Instance.UpdateTaskDefinition(row, cacheSource);
                                 }
                             }));
                         }
@@ -105,7 +110,7 @@ export class EntityTask {
                     reject(errDel);
                     return;
                 }
-                Database.Instance.Run('DELETE FROM task WHERE pname=?', [pname], (err) => {
+                Database.Instance.Run('DELETE FROM task WHERE pname=? and user_id=?', [pname, Environment.config.credentials.userId], (err) => {
                     if(err){
                         reject(err);
                     }else{
@@ -118,7 +123,7 @@ export class EntityTask {
 
     getTask<T>(pname: string): Promise<TaskModel<T>> {
         return new Promise<TaskModel<T>>((resolve, reject) => {
-            Database.Instance.Get(`SELECT pname, pdata, pstate, ptype, pdesc FROM task WHERE pname=?`, [pname], (err, row) => {
+            Database.Instance.Get(`SELECT pname, pdata, pstate, ptype, pdesc FROM task WHERE pname=? and user_id=?`, [pname, Environment.config.credentials.userId], (err, row) => {
                 if (err) {
                     reject(err);
                     return;

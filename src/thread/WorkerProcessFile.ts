@@ -8,9 +8,9 @@ import { EntityUpload } from "../persist/entities/EntityUpload";
 import { File } from "../sync/File";
 import * as fs from 'fs';
 import { UploadState } from '../sync/task/UploaderTask';
-import { WorkProcess } from "./UtilWorker";
 import { SystemWorker } from "./SystemWorker";
 import { FunctionsBinding } from "../ipc/FunctionsBinding";
+import { WorkProcess } from "../api/thread";
 
 export class WorkerProcessFile extends SystemWorker<any> {
     private static _instance: WorkerProcessFile;

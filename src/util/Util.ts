@@ -6,7 +6,7 @@ import * as path from 'path';
 import { PRIORITY_QUEUE } from '../queue/task';
 import { UploaderTask } from '../sync/task/UploaderTask';
 import { Environment } from '../config/env';
-import { Upaki, UpakiArchiveList } from 'upaki-cli';
+import { Upaki, UpakiArchiveList, UpakiUserProfile } from 'upaki-cli';
 
 export namespace Util {
     /**
@@ -118,6 +118,12 @@ export namespace Util {
         return list.data;
     }
 
+    export async function getUserProfile(): Promise<UpakiUserProfile> {
+        let upakiClient = new Upaki(Environment.config.credentials);
+        let profile = await upakiClient.getUserProfile();
+        return profile.data;
+    }
+
     export function WriteCache(cacheName, data, callback: (err: NodeJS.ErrnoException, cacheSource: string) => void) {
         let source = path.join(os.tmpdir(), 'upaki-cache');
 
@@ -132,12 +138,15 @@ export namespace Util {
         });
     }
 
+    export function getLogsPath() {
+        return path.join(getAppData(), getUpakiFolder(), 'logs');
+    }
     export function WriteTaskData(cacheName, data, callback: (err: NodeJS.ErrnoException, cacheSource: string) => void) {
         let source = path.join(getTaskStoreSource());
         if (!fs.existsSync(source)) {
             fs.mkdirSync(source);
         }
-        
+
         source = path.join(source, cacheName);
 
         fs.writeFile(source, JSON.stringify(data), 'utf-8', (err) => {
@@ -151,6 +160,13 @@ export namespace Util {
 
     export function getTaskStoreSource() {
         return path.join(getAppData(), getUpakiFolder(), 'tasks');
+    }
+
+    export function getDbSource(name?: string) {
+        if (name)
+            return path.join(getAppData(), getUpakiFolder(), 'data', name);
+        else
+            return path.join(getAppData(), getUpakiFolder(), 'data');
     }
 
     export function getAppData() {
@@ -177,7 +193,7 @@ export namespace Util {
         fs.unlink(source, callback);
     }
 
-    export function getAbsolutePath(folderPath, rootFolder, baseFolder = os.hostname()) {
+    export function getAbsolutePath(folderPath, rootFolder/*, baseFolder = os.hostname()*/) {
         /*folderPath = folderPath.replace('\\', '/');
         rootFolder = rootFolder.replace('\\', '/');*/
         // let filedir = folderPath.match(/(.*)[\/\\]/)[1] || '';
@@ -204,6 +220,6 @@ export namespace Util {
         if (srt[0] !== '/') {
             srt = addInStr(srt, 0, '/');
         }
-        return baseFolder + srt /*path.join(baseFolder, srt)*/;
+        return /*baseFolder +*/ srt /*path.join(baseFolder, srt)*/;
     }
 }

@@ -1,5 +1,6 @@
 import { Database } from '../Database';
 import { FunctionsBinding } from '../../ipc/FunctionsBinding';
+import { Environment } from '../../config/env';
 
 
 export class EntityFolderSync {
@@ -12,14 +13,14 @@ export class EntityFolderSync {
     }
 
     public ListFolders(callback: (err: Error, folders: string[]) => void) {
-        Database.Instance.All('SELECT folder FROM sync_folder', [], (err, rows) => {
+        Database.Instance.All('SELECT folder FROM sync_folder WHERE user_id=?', [Environment.config.credentials.userId], (err, rows) => {
             console.log(rows[0])
             callback(err, err ? [] : rows.map(el => { return el.folder; }));
         });
     }
 
     public AddFolder(src: string, callback: (err: Error) => void) {
-        Database.Instance.Run('INSERT INTO sync_folder (folder) VALUES(?)', [src], (err) => {
+        Database.Instance.Run('INSERT INTO sync_folder (folder, user_id) VALUES(?, ?)', [src, Environment.config.credentials.userId], (err) => {
             if (!err) {
                 FunctionsBinding.Instance.AddScanDir(src);
                 FunctionsBinding.Instance.AddWatch(src);
@@ -29,7 +30,7 @@ export class EntityFolderSync {
     }
 
     public DeleteFolder(src: string, callback: (err: Error) => void) {
-        Database.Instance.Run('DELETE FROM sync_folder WHERE folder=?', [src], (err) => {
+        Database.Instance.Run('DELETE FROM sync_folder WHERE folder=? and user_id=?', [src, Environment.config.credentials.userId], (err) => {
             if (!err) {
                 FunctionsBinding.Instance.StopScan(src);
                 FunctionsBinding.Instance.StopWatch(src);

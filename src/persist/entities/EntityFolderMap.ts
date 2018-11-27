@@ -1,10 +1,7 @@
 import * as crypto from 'crypto';
 import { Database } from '../Database';
-
-export interface FolderObject {
-    key: string;
-    id: string;
-}
+import { FolderObject } from '../../api/entity';
+import { Environment } from '../../config/env';
 
 export class EntityFolderMap {
     private static _instance: EntityFolderMap;
@@ -28,16 +25,16 @@ export class EntityFolderMap {
     save(folder: FolderObject, callback: (err: Error, data: any) => void) {
         let key = this.MD5SRC(folder.key);
         let data = JSON.stringify(folder);
-        Database.Instance.All(`SELECT data FROM ${this.table} WHERE key=?`, [key], (err, row) => {
+        Database.Instance.All(`SELECT data FROM ${this.table} WHERE key=? and user_id=?`, [key, Environment.config.credentials.userId], (err, row) => {
             if (err) {
                 callback(err, undefined);
             } else {
                 if (row[0]) {
-                    Database.Instance.Run(`UPDATE ${this.table} SET data=? WHERE key = ?`, [data, key], (errInsert) => {
+                    Database.Instance.Run(`UPDATE ${this.table} SET data=? WHERE key = ? and user_id=?`, [data, key, Environment.config.credentials.userId], (errInsert) => {
                         callback(errInsert, undefined);
                     });
                 } else {
-                    Database.Instance.Run(`INSERT INTO ${this.table}(key, data) VALUES(?,?)`, [key, data], (errInsert) => {
+                    Database.Instance.Run(`INSERT INTO ${this.table}(key, data, user_id) VALUES(?,?,?)`, [key, data, Environment.config.credentials.userId], (errInsert) => {
                         callback(errInsert, undefined);
                     });
                 }
@@ -49,7 +46,7 @@ export class EntityFolderMap {
         return new Promise<number>((resolve, reject) => {
             let key = this.MD5SRC(oldPath);
             let newKey = this.MD5SRC(newPath);
-            Database.Instance.Get(`SELECT data FROM ${this.table} WHERE key=?`, [key], (err, row) => {
+            Database.Instance.Get(`SELECT data FROM ${this.table} WHERE key=? and user_id=?`, [key, Environment.config.credentials.userId], (err, row) => {
                 if (err) {
                     reject(err);
                     return;
@@ -58,7 +55,7 @@ export class EntityFolderMap {
                     let data = JSON.parse(row.data) as FolderObject;
                     data.key = newPath;
 
-                    Database.Instance.Run(`UPDATE ${this.table} SET key=?, data=? WHERE key = ?`, [newKey, JSON.stringify(data), key], (errInsert) => {
+                    Database.Instance.Run(`UPDATE ${this.table} SET key=?, data=? WHERE key = ? and user_id=?`, [newKey, JSON.stringify(data), key, Environment.config.credentials.userId], (errInsert) => {
                         if (errInsert) {
                             reject(errInsert);
                             return;
@@ -75,7 +72,7 @@ export class EntityFolderMap {
     getFolder(path: string): Promise<FolderObject> {
         return new Promise<FolderObject>((resolve, reject) => {
             let key = this.MD5SRC(path);
-            Database.Instance.Get(`SELECT data FROM ${this.table} WHERE key=?`, [key], (err, row) => {
+            Database.Instance.Get(`SELECT data FROM ${this.table} WHERE key=? and user_id=?`, [key, Environment.config.credentials.userId], (err, row) => {
                 if (err) {
                     reject(err);
                 } else {

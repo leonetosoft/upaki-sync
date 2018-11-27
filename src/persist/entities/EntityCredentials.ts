@@ -4,12 +4,7 @@ import { Database } from "../Database";
 import { Environment } from '../../config/env';
 import { WorkerMaster } from "../../thread/WorkerMaster";
 import { Logger } from "../../util/Logger";
-
-export interface CredentialDevice {
-    device_id: string;
-    credential_key: string;
-    token: string;
-}
+import { CredentialDevice } from "../../api/entity";
 
 export class EntityCredentials {
     private static _instance: EntityCredentials;
@@ -55,7 +50,8 @@ export class EntityCredentials {
         Environment.config.credentials = {
             deviceId: credentials.device_id,
             credentialKey: credentials.credential_key,
-            secretToken: credentials.token
+            secretToken: credentials.token,
+            userId: credentials.user_id
         };
     }
 
@@ -70,7 +66,7 @@ export class EntityCredentials {
 
     getCredentials(): Promise<CredentialDevice> {
         return new Promise((resolve, reject) => {
-            Database.Instance.Get(`SELECT device_id, credential_key, token FROM credential`, [], (err, row) => {
+            Database.Instance.Get(`SELECT device_id, credential_key, token, user_id FROM credential`, [], (err, row) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -116,8 +112,8 @@ export class EntityCredentials {
     saveCredential(credential: DeviceAuthResponse, update: boolean): Promise<boolean> {
         return new Promise((resolve, reject) => {
             if (update) {
-                Database.Instance.Run(`UPDATE credential SET credential_key=?, token=? WHERE device_id=?`,
-                    [credential.credentialKey, credential.secretToken, credential.deviceId], (errInsert) => {
+                Database.Instance.Run(`UPDATE credential SET credential_key=?, token=?, user_id=? WHERE device_id=?`,
+                    [credential.credentialKey, credential.secretToken, credential.userId, credential.deviceId], (errInsert) => {
                         if (errInsert) {
                             reject(errInsert);
                             return;
@@ -125,8 +121,8 @@ export class EntityCredentials {
                         resolve(true);
                     });
             } else {
-                Database.Instance.Run(`INSERT INTO credential(device_id, credential_key, token) VALUES(?, ?, ?)`,
-                    [credential.deviceId, credential.credentialKey, credential.secretToken], (errInsert) => {
+                Database.Instance.Run(`INSERT INTO credential(device_id, credential_key, token, user_id) VALUES(?, ?, ?, ?)`,
+                    [credential.deviceId, credential.credentialKey, credential.secretToken, credential.userId], (errInsert) => {
                         if (errInsert) {
                             reject(errInsert);
                             return;

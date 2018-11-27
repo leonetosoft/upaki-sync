@@ -1,7 +1,7 @@
 import { Logger } from "../util/Logger";
-import { WorkProcess } from "./UtilWorker";
 import { SocketClient } from "../socket/SocketClient";
 import { SystemWorker } from './SystemWorker';
+import { WorkProcess } from "../api/thread";
 
 export class WorkerSocket extends SystemWorker<any> {
   UPLOAD_LIST = [];

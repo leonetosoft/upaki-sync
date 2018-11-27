@@ -1,12 +1,12 @@
 //import * as ipc from 'node-ipc';
-import { WorkProcess, Shutdown, ProcesSys, ProcTaskState } from './UtilWorker';
+import { Shutdown, ProcesSys } from './UtilWorker';
 import { SharedReceiveCall, SharedResponseCall } from '../ipc/EventBinding';
 import { FunctionsBinding } from '../ipc/FunctionsBinding';
 import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
 import { createQueuedSender } from '../ipc/QueueSender';
-import { TaskModel, EntityTask } from '../persist/entities/EntityTask';
+import { EntityTask } from '../persist/entities/EntityTask';
 import { Logger } from '../util/Logger';
-import { Util } from '../util/Util';
+import { TaskModel, WorkProcess, ProcTaskState } from '../api/thread';
 
 export interface WorkerListeners {
     Listen: (msg: any) => void;
@@ -33,12 +33,23 @@ export class SystemWorker<T> {
 
     set model(model) {
         this.modelProcess = model;
+        this.modelProcess.pstate = ProcTaskState.STARTED;
         this.MonitoreProcess();
     }
 
-    protected DefaultListem(msg: any) {
+    protected async DefaultListem(msg: any) {
         if (msg === 'shutdown') {
-            Shutdown();
+            this.modelProcess.pstate = ProcTaskState.STOPPED;
+            try {
+                Logger.info(`Shuttdown received in pid ${process.pid}`);
+                await this.SaveData();
+                Logger.info(`Data Saved in pid ${process.pid}`);
+            } catch (error) {
+                Logger.error(error);
+            } finally {
+                Logger.info(`Send Exit code in pid ${process.pid}`);
+                Shutdown();
+            }
             return;
         }
 
@@ -63,20 +74,20 @@ export class SystemWorker<T> {
         }
     }
 
-    UpdateTaskDefs() {
-        if (!this.model.pdata || !this.pname) {
-            Logger.warn(`UpdateTaskDefs in process ${process.pid} is invalid !!`);
-            return;
-        }
-        let dataCache = JSON.stringify(this.model.pdata);
-        Util.WriteCache(this.pname, dataCache, (err, cacheSource) => {
-            if (err) {
-                Logger.error(err);
-            } else {
-                UIFunctionsBinding.Instance.UpdateTaskDefinition(this.pname, cacheSource);
-            }
-        });
-    }
+    /* UpdateTaskDefs() {
+         if (!this.model.pdata || !this.pname) {
+             Logger.warn(`UpdateTaskDefs in process ${process.pid} is invalid !!`);
+             return;
+         }
+         let dataCache = JSON.stringify(this.model.pdata);
+         Util.WriteCache(this.pname, dataCache, (err, cacheSource) => {
+             if (err) {
+                 Logger.error(err);
+             } else {
+                 UIFunctionsBinding.Instance.UpdateTaskDefinition(this.pname, cacheSource);
+             }
+         });
+     }*/
 
     MonitoreProcess() {
         if (!this.model)

@@ -1,5 +1,4 @@
 import { Logger } from "../util/Logger";
-import { WorkProcess } from "./UtilWorker";
 import { Util } from "../util/Util";
 import { QueueUploader } from "../sync/queue/QueueUploader";
 import { UploaderTask, UploadState } from "../sync/task/UploaderTask";
@@ -8,6 +7,7 @@ import { SystemWorker } from './SystemWorker';
 import { S3StreamSessionDetails } from "upaki-cli";
 import { FunctionsBinding } from "../ipc/FunctionsBinding";
 import { UIFunctionsBinding } from "../ipc/UIFunctionsBinding";
+import { WorkProcess } from "../api/thread";
 
 export class WorkerUpload extends SystemWorker<any> {
     private static _instance: WorkerUpload;

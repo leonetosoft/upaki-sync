@@ -5,12 +5,13 @@ import * as util from 'util';
 import * as path from 'path';
 import * as moment from 'moment';
 import { Sentry } from './Sentry';
+import { Util } from './Util';
 
 export namespace Logger {
     // export declare var LogInfoWriter, LogErrorWriter, LogDebugWriter, LogWarnWritter;
 
     export function WriteFile(msg, type) {
-        let pathLog = path.join('logs');
+        let pathLog = Util.getLogsPath();
         if (!fs.existsSync(pathLog)) {
             fs.mkdirSync(pathLog);
         }

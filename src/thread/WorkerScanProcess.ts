@@ -2,7 +2,6 @@ import { Database } from './../persist/Database';
 import { UploadState } from './../sync/task/UploaderTask';
 import { EntityUpload } from './../persist/entities/EntityUpload';
 import { Logger } from "../util/Logger";
-import { WorkProcess } from "./UtilWorker";
 import * as events from 'events';
 import { ScanFast } from '../sync/ScanFast';
 import { Util } from '../util/Util';
@@ -13,6 +12,7 @@ import { EntityFolderSync } from '../persist/entities/EntityFolderSync';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { WorkProcess } from '../api/thread';
 
 export interface ScanTasks {
     path: string;

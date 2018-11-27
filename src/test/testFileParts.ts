@@ -1,7 +1,8 @@
 import { UploadState } from './../sync/task/UploaderTask';
-import { EntityUpload, EntityUploadData } from './../persist/entities/EntityUpload';
+import { EntityUpload } from './../persist/entities/EntityUpload';
 import { production } from './../config/production';
 import { Environment } from '../config/env';
+import { EntityUploadData } from '../api/entity';
 Environment.config = production;
 
 /*let insertTest: EntityUploadData = {

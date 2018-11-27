@@ -1,7 +1,7 @@
 import * as cluster from 'cluster';
 import { Worker } from 'cluster';
 import { Logger } from '../util/Logger';
-import { WorkProcess, ProcesSys, ProcessType, ProcTaskState } from './UtilWorker';
+import { ProcesSys } from './UtilWorker';
 import * as events from 'events';
 import { UIEvents } from '../ipc/UIEvents';
 import { SharedReceiveCall, SharedResponseCall } from '../ipc/EventBinding';
@@ -9,8 +9,11 @@ import { FunctionsBinding } from '../ipc/FunctionsBinding';
 import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
 import { createQueuedSender, IQueuedSender } from '../ipc/QueueSender';
 import * as uuidv1 from 'uuid/v1';
-import { TaskModel, EntityTask } from '../persist/entities/EntityTask';
-import { PendingFolder, DownloadProcData, ScanDownloadState } from './WorkerDownload';
+import { EntityTask } from '../persist/entities/EntityTask';
+import { DownloadProcData, ScanDownloadState } from '../api/download';
+import { Database } from '../persist/Database';
+import { PendingFolder } from '../api/download';
+import { WorkerProcess, TaskModel, ProcessType, WorkProcess, ProcTaskState } from '../api/thread';
 // import { UploadList } from '../ipc/IPCInterfaces';
 /*export class testBing implements UIEvents {
     UploadList(list: UploadList) {
@@ -23,14 +26,6 @@ import { PendingFolder, DownloadProcData, ScanDownloadState } from './WorkerDown
         throw new Error("Method not implemented.");
     }
 }*/
-
-export interface WorkerProcess {
-    pname: string;
-    WORKER: Worker;
-    sender?: IQueuedSender;
-    ready?: boolean;
-}
-
 export class WorkerMaster {
     private static _instance: WorkerMaster;
     WORKER_SOCKET: Worker;
@@ -87,7 +82,7 @@ export class WorkerMaster {
                     path: [],
                     state: ScanDownloadState.CREATED
                 },
-                pstate: ProcTaskState.CREATED
+                pstate: ProcTaskState.STOPPED
             };
 
             if (pname) {
@@ -121,12 +116,11 @@ export class WorkerMaster {
         });
     }
 
-    public StopTask(pname: string) {
+    public async StopTask(pname: string): Promise<any> {
         let indexOfProc = this.PROCESS_LIST.findIndex(el => el.pname === pname);
-        if (indexOfProc) {
-            this.PROCESS_LIST[indexOfProc].WORKER.kill();
-            this.PROCESS_LIST.splice(indexOfProc, 1);
-            Logger.info(`Process task ${pname} terminated by user!`);
+        if (indexOfProc !== -1) {
+            await this.ShutdownWorkers(this.PROCESS_LIST[indexOfProc].sender, this.PROCESS_LIST[indexOfProc].WORKER);
+            this.PROCESS_LIST.splice(indexOfProc, 1); 
         } else {
             throw new Error(`Process task ${pname} not found or not started!`);
         }
@@ -134,7 +128,7 @@ export class WorkerMaster {
 
     public async DeleteTask(pname: string) {
         try {
-            this.StopTask(pname);
+            await this.StopTask(pname);
         } catch (error) {
             // ignore !
             Logger.warn(`Request stop ${pname} : ${error.message}`);
@@ -277,6 +271,68 @@ export class WorkerMaster {
 
     }
 
+    private ForkDefaultWorker(workerType: WorkProcess): Promise<[Worker, IQueuedSender]> {
+        return new Promise((resolve, reject) => {
+            var new_worker_env = {};
+            new_worker_env["DEFAULT_TYPE"] = workerType;
+
+            let newWorker = cluster.fork(new_worker_env);
+
+            newWorker.on('message', this.Listen.bind(this));
+
+            let timeout = setTimeout(() => {
+                reject(new Error('Processo demorou demais para ser iniciado'));
+            }, 60000);
+
+            let sender = createQueuedSender(newWorker.process);
+            newWorker.on('online', () => {
+                clearTimeout(timeout);
+                resolve([newWorker, sender]);
+            });
+
+        })
+    }
+
+    InitV2(onInit?: (err?) => void) {
+        Database.Instance.InitDatabase().then(rs => {
+            return Promise.all([
+                this.ForkDefaultWorker(WorkProcess.WORKER_PROCESS_FILE),
+                this.ForkDefaultWorker(WorkProcess.WORKER_UPLOAD),
+                this.ForkDefaultWorker(WorkProcess.WORKER_SOCKET)
+            ])
+        }).then(rs => {
+            this.WORKER_PROCESS_FILE = rs[0][0];
+            this.WORKER_PROCESS_FILE_SENDER = rs[0][1];
+
+            this.WORKER_UPLOAD = rs[1][0];
+            this.WORKER_UPLOAD_SENDER = rs[1][1];
+
+            this.WORKER_SOCKET = rs[2][0];
+            this.WORKER_SOCKET_SENDER = rs[2][1];
+
+            return Promise.all([
+                this.ForkDefaultWorker(WorkProcess.WORKER_SCAN_PROCESS),
+                this.ForkDefaultWorker(WorkProcess.WORKER_WHATCHER)
+            ])
+        }).then((rs) => {
+            this.WORKER_SCAN_PROCESS = rs[0][0];
+            this.WORKER_SCAN_PROCESS_SENDER = rs[0][1];
+
+            this.WORKER_WHATCHER = rs[1][0];
+            this.WORKER_WHATCHER_SENDER = rs[1][1];
+
+            this.ProcessStarted();
+            this.ListenShutdownClusters();
+            
+            if (onInit)
+                onInit();
+        }).catch(err => {
+            console.log(err);
+            if (onInit)
+                onInit(err);
+        })
+
+    }
     Init(onInit?: () => void) {
         this.ready = false;
         this.WORKER_PROCESS_FILE = cluster.fork();
@@ -433,6 +489,9 @@ export class WorkerMaster {
                 this.WORKER_SOCKET_SENDER.send({ type: msg.type_to, data: msg.data });
                 break;
             case WorkProcess.WORKER_SCAN_PROCESS:
+                this.WORKER_SCAN_PROCESS_SENDER.send({ type: msg.type_to, data: msg.data });
+                break;
+            case WorkProcess.WORKER_WHATCHER:
                 this.WORKER_SCAN_PROCESS_SENDER.send({ type: msg.type_to, data: msg.data });
                 break;
             case WorkProcess.MASTER:

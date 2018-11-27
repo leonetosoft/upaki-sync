@@ -1,11 +1,11 @@
 import { Database } from './../persist/Database';
 import { Logger } from "../util/Logger";
-import { WorkProcess } from "./UtilWorker";
 import { SyncDataNative } from "../sync/SyncDataNative";
 import { FileTypeAction } from "../sync/task/FileTask";
 import { EntityFolderSync } from '../persist/entities/EntityFolderSync';
 import { SystemWorker } from './SystemWorker';
 import { FunctionsBinding } from '../ipc/FunctionsBinding';
+import { WorkProcess } from '../api/thread';
 
 export interface WhacterFolder {
     path: string;

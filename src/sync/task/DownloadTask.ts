@@ -1,5 +1,4 @@
 import { Task } from "../../queue/task";
-import { PendingFile, DownloadFileState } from "../../thread/WorkerDownload";
 import { Upaki } from "upaki-cli";
 import { Environment } from "../../config/env";
 import * as request from 'request';
@@ -11,6 +10,7 @@ import { Util } from "../../util/Util";
 import * as zlib from 'zlib';
 import { setTimeout } from "timers";
 import * as events from 'events';
+import { PendingFile, DownloadFileState } from "../../api/download";
 
 
 export interface DownloadEvents {
@@ -275,7 +275,7 @@ export class DownloadTask extends Task {
                     Logger.debug(`Speed=${this.speedBps} Type: ${this.speedType} Speed: ${this.speed} preventTimeLeft: ${this.preventTimeLeft}`);
                     this.lastPercent = fixedPercent;
 
-                    this.fileDownload.downloadSpeed = `${this.speedBps} ${this.speedType}`;
+                    this.fileDownload.downloadSpeed = `${this.speed} ${this.speedType}`;
                     this.fileDownload.downloadTime = `${this.preventTimeLeft}`;
                     Logger.debug(`${this.fileDownload.name}: Progress ${this.fileDownload.progress}`);
                 }

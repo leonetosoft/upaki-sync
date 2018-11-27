@@ -10,7 +10,7 @@ export interface Config {
     },
     synchPath: string,
     credentialsPath: string,
-    credentials?: { secretToken: string, credentialKey: string, deviceId?: string };
+    credentials?: { secretToken: string, credentialKey: string, deviceId?: string, userId?: string };
     database: {
         filedb: string;
     },

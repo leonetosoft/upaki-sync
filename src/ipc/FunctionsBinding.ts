@@ -1,5 +1,4 @@
 import { SharedFuncion } from "./EventBinding";
-import { WorkProcess } from "../thread/UtilWorker";
 import { WorkerScanProcess } from "../thread/WorkerScanProcess";
 import { WorkerWatcher } from "../thread/WorkerWatcher";
 import { WorkerUpload } from "../thread/WorkerUpload";
@@ -14,7 +13,9 @@ import * as readline from 'readline';
 import * as os from 'os';
 import { Util } from "../util/Util";
 import * as path from 'path';
-import { DownloadUiAction, WorkerDownload } from "../thread/WorkerDownload";
+import { WorkerDownload } from "../thread/WorkerDownload";
+import { DownloadUiAction } from "../api/download";
+import { WorkProcess } from "../api/thread";
 
 export class FunctionsBinding {
     private static _instance: FunctionsBinding;

@@ -1,7 +1,6 @@
 import { Environment, Config } from './config/env';
 import * as cluster from 'cluster';
 import { PrintCredits } from './credits';
-import { WorkProcess } from './thread/UtilWorker';
 import { WorkerMaster } from './thread/WorkerMaster';
 import { Database } from './persist/Database';
 import { WorkerProcessFile } from './thread/WorkerProcessFile';
@@ -10,6 +9,7 @@ import { WorkerSocket } from './thread/WorkerSocket';
 import { WorkerScanProcess } from './thread/WorkerScanProcess';
 import { WorkerWatcher } from './thread/WorkerWatcher';
 import { Logger } from './util/Logger';
+import { WorkProcess } from './api/thread';
 
 export function BootSync(config: Config){
     Environment.config = config;

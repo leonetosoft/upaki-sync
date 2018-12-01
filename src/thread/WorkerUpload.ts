@@ -99,7 +99,7 @@ export class WorkerUpload extends SystemWorker<any> {
             let taskByPriority = QueueUploader.Instance.tasks.getTaskListByPriority();
 
             let totalSend = taskByPriority.reduce<number>((i, el) => {
-                return i + (el.task.file.getSize() - el.task.loaded);
+                    return i + (el.task.file.getSize(true) - el.task.loaded);
             }, 0);
 
             let numberOfUploads = taskByPriority.length;
@@ -114,22 +114,29 @@ export class WorkerUpload extends SystemWorker<any> {
 
             let listUpload = taskByPriority.slice(0, 5).map(task => {
                 let upload = task.task;
-                return {
-                    path: upload.file.getPath(),
-                    cloudpath: upload.file.getKey(),
-                    state: upload.state,
-                    parts: upload.session.Parts,
-                    loaded: upload.loaded,
-                    uploadType: upload.uploadType,
-                    size: upload.file.getSize(),
-                    name: upload.file.getFullName(),
-                    key: upload.file.getKey(),
-                    preventTimeLeft: upload.preventTimeLeft,
-                    speedBps: upload.speedBps,
-                    speed: upload.speed,
-                    speedType: upload.speedType
-                }
-            });
+
+               // if (upload.file.Exists()) {
+                    return {
+                        path: upload.file.getPath(),
+                        cloudpath: upload.file.getKey(),
+                        state: upload.state,
+                        parts: upload.session.Parts,
+                        loaded: upload.loaded,
+                        uploadType: upload.uploadType,
+                        size: upload.file.getSize(true),
+                        name: upload.file.getFullName(),
+                        key: upload.file.getKey(),
+                        preventTimeLeft: upload.preventTimeLeft,
+                        speedBps: upload.speedBps,
+                        speed: upload.speed,
+                        speedType: upload.speedType
+                    }
+               /* } else {
+                    Logger.warn(`Task upload file ${task.id}, file not exists!!! removed from queue ${upload.file.filePath}`);
+                    task.Finish();
+                    return undefined;
+                }*/
+            })/*.filter(el => el !== undefined)*/;
 
             /*MessageToWorker(WorkProcess.WORKER_SOCKET, {
                 type: 'UPLOAD_LIST', data: {

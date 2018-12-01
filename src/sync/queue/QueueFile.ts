@@ -54,7 +54,7 @@ export class QueueFile {
         });
 
         this.tasks.Event('taskProcessing', (task) => {
-            Logger.info(`Task File Process Processing id ${task.id}`);
+            Logger.debug(`Task File Process Processing id ${task.id}`);
         });
 
         this.tasks.Event('taskMaxRetries', (task) => {
@@ -66,7 +66,7 @@ export class QueueFile {
         });
 
         this.tasks.Event('taskUnQueue', (task) => {
-            Logger.warn(`Task File Process removed from queue id ${task.id}`);
+            Logger.debug(`Task File Process removed from queue id ${task.id}`);
         });
     }
 

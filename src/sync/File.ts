@@ -7,7 +7,7 @@ export class File {
     lastModifies: string;
     rootFolder: string;
     key: string;
-    sizeCache: number;
+    sizeCache: number = 0;
 
     constructor(filePath: string, rootFolder: string) {
         this.filePath = filePath;

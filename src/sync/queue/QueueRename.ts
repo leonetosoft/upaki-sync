@@ -38,7 +38,7 @@ export class QueueRename {
         Logger.info(`[FileAction] - Queue initialized taskSize[${Environment.config.queue.renameAction.taskSize}] maxRetries[${Environment.config.queue.renameAction.maxRetries}] retryDelay[${Environment.config.queue.renameAction.retryDelay}]`)
         
         this.tasks.Event('taskFinish', (task) => {
-            Logger.info(`Task Rename File Process ended id ${task.id}`);
+            Logger.debug(`Task Rename File Process ended id ${task.id}`);
         });
 
         this.tasks.Event('taskRetry', (task) => {
@@ -46,7 +46,7 @@ export class QueueRename {
         });
 
         this.tasks.Event('taskProcessing', (task) => {
-            Logger.info(`Task Rename File Process Processing id ${task.id}`);
+            Logger.debug(`Task Rename File Process Processing id ${task.id}`);
         });
 
         this.tasks.Event('taskMaxRetries', (task) => {
@@ -54,7 +54,7 @@ export class QueueRename {
         });
 
         this.tasks.Event('taskUnQueue', (task) => {
-            Logger.warn(`Task Rename File Process removed from queue id ${task.id}`);
+            Logger.debug(`Task Rename File Process removed from queue id ${task.id}`);
         });
     }
 

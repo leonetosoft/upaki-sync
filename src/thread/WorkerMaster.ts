@@ -120,7 +120,7 @@ export class WorkerMaster {
         let indexOfProc = this.PROCESS_LIST.findIndex(el => el.pname === pname);
         if (indexOfProc !== -1) {
             await this.ShutdownWorkers(this.PROCESS_LIST[indexOfProc].sender, this.PROCESS_LIST[indexOfProc].WORKER);
-            this.PROCESS_LIST.splice(indexOfProc, 1); 
+            this.PROCESS_LIST.splice(indexOfProc, 1);
         } else {
             throw new Error(`Process task ${pname} not found or not started!`);
         }
@@ -211,15 +211,18 @@ export class WorkerMaster {
             let timeout;
             Logger.info(`Request close process ${worker.process.pid} ...`);
             workerSender.send('shutdown');
-            worker.disconnect();
-            Logger.info(`Send shutdown and close IPC Channel, await disconnect event ${worker.process.pid} ...`);
+
             timeout = setTimeout(() => {
+                worker.disconnect();
+                Logger.info(`Send shutdown and close IPC Channel, await disconnect event ${worker.process.pid} ...`);
                 Logger.warn(`Process force disconnection ${worker.process.pid} ...`);
                 worker.kill();
                 resolve(worker.process.pid);
             }, 2000);
 
             worker.on('disconnect', () => {
+                worker.disconnect();
+                Logger.info(`Send shutdown and close IPC Channel, await disconnect event ${worker.process.pid} ...`);
                 Logger.info(`Process ${worker.process.pid} gracefull close`);
                 clearTimeout(timeout);
                 resolve(worker.process.pid);
@@ -323,7 +326,7 @@ export class WorkerMaster {
 
             this.ProcessStarted();
             this.ListenShutdownClusters();
-            
+
             if (onInit)
                 onInit();
         }).catch(err => {

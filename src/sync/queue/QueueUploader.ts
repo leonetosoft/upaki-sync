@@ -40,7 +40,7 @@ export class QueueUploader {
         Logger.info(`[UploaderTask] - Queue initialized taskSize[${Environment.config.queue.uploader.taskSize}] maxRetries[${Environment.config.queue.uploader.maxRetries}] retryDelay[${Environment.config.queue.uploader.retryDelay}]`)
 
         this.tasks.Event('taskFinish', (task) => {
-            Logger.info(`Upload File Process ended id ${task.id}`);
+            Logger.debug(`Upload File Process ended id ${task.id}`);
             WorkerUpload.Instance.sendUploadList();
         });
 
@@ -49,7 +49,7 @@ export class QueueUploader {
         });
 
         this.tasks.Event('taskProcessing', (task) => {
-            Logger.info(`Upload File Process Processing id ${task.id}`);
+            Logger.debug(`Upload File Process Processing id ${task.id}`);
         });
 
         this.tasks.Event('taskMaxRetries', (task) => {
@@ -57,7 +57,7 @@ export class QueueUploader {
         });
 
         this.tasks.Event('taskUnQueue', (task) => {
-            Logger.warn(`Upload File Process removed from queue id ${task.id}`);
+            Logger.debug(`Upload File Process removed from queue id ${task.id}`);
             WorkerUpload.Instance.sendUploadList();
         });
     }
@@ -67,6 +67,8 @@ export class QueueUploader {
     addJob(job: UploaderTask) {
         if (!this.isAlreadyUploading(job.file.filePath)) {
             this.tasks.AddJob(job);
+        } else {
+            Logger.warn(`File  ${job.file.filePath} already uploading!`);
         }
     }
 }

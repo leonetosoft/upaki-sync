@@ -16,10 +16,6 @@ export class WorkerDownload extends SystemWorker<DownloadProcData> {
         super(WorkProcess.WORKER_DOWNLOAD, process.env['PNAME'])
     }
 
-    async LoadData() {
-        this.model = await EntityTask.Instance.getTask<DownloadProcData>(this.pname);
-    }
-
     UpdateUiHandler() {
         setInterval(async () => {
             this.SaveData();
@@ -78,10 +74,6 @@ export class WorkerDownload extends SystemWorker<DownloadProcData> {
         } catch (error) {
             Logger.error(error);
         }
-    }
-
-    get pData() {
-        return this.model.pdata;
     }
 
     private OnCompleteScanFolder() {

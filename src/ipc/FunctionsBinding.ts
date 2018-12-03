@@ -16,6 +16,7 @@ import * as path from 'path';
 import { WorkerDownload } from "../thread/WorkerDownload";
 import { DownloadUiAction } from "../api/download";
 import { WorkProcess } from "../api/thread";
+import { WorkerFileReceiver } from "../thread/WorkerFileReceiver";
 
 export class FunctionsBinding {
     private static _instance: FunctionsBinding;
@@ -162,6 +163,18 @@ export class FunctionsBinding {
     DownloadAction(taskId: string, queueId: string, action: DownloadUiAction, callback: (err, rs) => void) {
         try {
             WorkerDownload.Instance.uiAction(queueId, action, callback);
+        } catch (error) {
+            Logger.error(error);
+        }
+    }
+
+    @SharedFuncion({
+        mainWorter: WorkProcess.WORKER_FILE_RECEIVER,
+        response: true
+    })
+    UpdateParamsFileReceiver(taskId: string, port: number, destFolder: string, callback: (err, rs) => void) {
+        try {
+            WorkerFileReceiver.Instance.UpdateParams(port, destFolder, callback);
         } catch (error) {
             Logger.error(error);
         }

@@ -30,6 +30,7 @@ export * from './util/Util';
 export * from './api/download';
 export * from './api/thread';
 export * from './api/entity';
+export * from './api/filereceiver';
 
 // entity
 export * from './persist/Database';
@@ -51,6 +52,8 @@ import { WorkerWatcher } from './thread/WorkerWatcher';
 import { Logger } from './util/Logger';
 import { WorkerDownload } from './thread/WorkerDownload';
 import { WorkProcess, ProcessType } from './api/thread';
+import { Database } from './persist/Database';
+import { WorkerFileReceiver } from './thread/WorkerFileReceiver';
 
 export function BootSync(config: Config, onInit?: (err?) => void) {
     // Environment.config = config;
@@ -61,6 +64,8 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
         // Database.Instance.setMaster();
         if (Environment.config.credentials && Environment.config.credentials.credentialKey && Environment.config.credentials.secretToken) {
             WorkerMaster.Instance.InitV2(onInit);
+        } else {
+            Database.Instance.InitDatabase();
         }
 
         /* WorkerMaster.Instance.CreateDownloadTask([{
@@ -82,6 +87,10 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
                     //Database.Instance.setMaster();
                     WorkerDownload.Instance.initScan();
                     break;
+
+                case ProcessType.FILE_RECEIVER:
+                    WorkerFileReceiver.Instance.InitService();
+                    break;
             }
         } else {
             switch (Number(process.env['DEFAULT_TYPE'])) {
@@ -93,7 +102,7 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
                 case WorkProcess.WORKER_UPLOAD:
                     //Database.Instance.setMaster();
                     Environment.config.worker = WorkProcess.WORKER_UPLOAD;
-                 WorkerUpload.Instance.Init();
+                    WorkerUpload.Instance.Init();
                     break;
                 case WorkProcess.WORKER_SOCKET:
                     Environment.config.worker = WorkProcess.WORKER_SOCKET;

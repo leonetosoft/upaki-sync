@@ -23,11 +23,13 @@ export enum WorkProcess {
     WORKER_SOCKET = 3,
     WORKER_SCAN_PROCESS = 4,
     WORKER_WHATCHER = 5,
-    WORKER_DOWNLOAD = ''
+    WORKER_DOWNLOAD = '',
+    WORKER_FILE_RECEIVER = ''
 }
 
 export enum ProcessType {
-    DOWNLOAD = 1
+    DOWNLOAD = 1,
+    FILE_RECEIVER = 2
 }
 
 export enum ProcTaskState {

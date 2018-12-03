@@ -14,6 +14,7 @@ import { DownloadProcData, ScanDownloadState } from '../api/download';
 import { Database } from '../persist/Database';
 import { PendingFolder } from '../api/download';
 import { WorkerProcess, TaskModel, ProcessType, WorkProcess, ProcTaskState } from '../api/thread';
+import { FileReceiverProcData } from '../api/filereceiver';
 // import { UploadList } from '../ipc/IPCInterfaces';
 /*export class testBing implements UIEvents {
     UploadList(list: UploadList) {
@@ -66,6 +67,32 @@ export class WorkerMaster {
 
     public RegisterUI(ui: UIEvents) {
         this.implUi.push(ui);
+    }
+
+    public StartFileReceiverTask(port: number, receivePath: string): Promise<WorkerProcess> {
+        return new Promise((resolve, reject) => {
+            let task: TaskModel<FileReceiverProcData> = {
+                pdesc: `Terminal de Recebimento`,
+                ptype: ProcessType.FILE_RECEIVER,
+                pdata: {
+                    port: port,
+                    receivePath: receivePath,
+                    totalReceive: 0,
+                    eventLog: [],
+                    ip: '-.-.-.-',
+                    ready: false
+                },
+                pstate: ProcTaskState.STOPPED
+            };
+
+            this.forkProcess(task, true, (err, worker) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(worker);
+                }
+            })
+        });
     }
 
     public CreateDownloadTask(pendFolders: PendingFolder[], pdesc: string, destinination: string, pname = undefined, forcesave = false): Promise<WorkerProcess> {
@@ -127,11 +154,13 @@ export class WorkerMaster {
     }
 
     public async DeleteTask(pname: string) {
-        try {
-            await this.StopTask(pname);
-        } catch (error) {
-            // ignore !
-            Logger.warn(`Request stop ${pname} : ${error.message}`);
+        if (this.isTaskOnline(pname)) {
+            try {
+                await this.StopTask(pname);
+            } catch (error) {
+                // ignore !
+                Logger.warn(`Request stop ${pname} : ${error.message}`);
+            }
         }
         await EntityTask.Instance.Delete(pname);
     }
@@ -189,6 +218,10 @@ export class WorkerMaster {
                 proc.WORKER.on('online', () => {
                     proc.ready = true;
                     Logger.info(`Process task ${newProcess.pname} identified by ${newProcess.pname} is ready!`);
+                    let indexOfProc = this.PROCESS_LIST.findIndex(el => el.pname === newProcess.pname);
+                    if(indexOfProc === -1){
+                        this.PROCESS_LIST.push(proc);
+                    }
                     callback(undefined, proc);
                 });
 
@@ -272,6 +305,30 @@ export class WorkerMaster {
 
 
 
+    }
+
+    public isTaskOnline(pname: string) {
+        return this.PROCESS_LIST.some(el => el.pname === pname);
+    }
+
+    public async UpdateTaskOffline<T>(pname: string, callbackUpdate: (err, taskData: TaskModel<T>, update: (callback: (err) => void) => void) => void) {
+        try {
+            let task = await EntityTask.Instance.getTask<T>(pname);
+            if (task) {
+                callbackUpdate(undefined, task, async (callbackPorcUp: (err) => void) => {
+                    try {
+                        await EntityTask.Instance.UpdateData(task);
+                        callbackPorcUp(undefined);
+                    } catch (error) {
+                        callbackPorcUp(error);
+                    }
+                });
+            } else {
+                callbackUpdate(new Error(`Task ${pname} not found`), undefined, undefined);
+            }
+        } catch (error) {
+            callbackUpdate(error, undefined, undefined);
+        }
     }
 
     private ForkDefaultWorker(workerType: WorkProcess): Promise<[Worker, IQueuedSender]> {
@@ -517,7 +574,7 @@ export class WorkerMaster {
 
                 let task = this.PROCESS_LIST.find(el => el.pname === taskId);
                 if (task) {
-                    task.WORKER.send({ type: msg.type_to, data: msg.data });
+                    task.sender.send({ type: msg.type_to, data: msg.data });
                 } else {
                     // throw new Error(`Tarefa não encontrada ou nao iniciada`);
                     Logger.error(`Msg destined for task ${taskId} not sended, task not found`);
@@ -527,13 +584,15 @@ export class WorkerMaster {
     }
 
     ListenShutdownClusters() {
-        let shutdown = () => {
+        let shutdown = async () => {
             Logger.info('Shutting down workers...');
 
-            this.WORKER_PROCESS_FILE_SENDER.send('shutdown');
+         /*   this.WORKER_PROCESS_FILE_SENDER.send('shutdown');
             this.WORKER_UPLOAD_SENDER.send('shutdown');
             this.WORKER_SOCKET_SENDER.send('shutdown');
-            this.WORKER_SCAN_PROCESS_SENDER.send('shutdown');
+            this.WORKER_SCAN_PROCESS_SENDER.send('shutdown');*/
+
+            await this.CloseAllProcess();
         };
 
         process.on('SIGTERM', shutdown.bind(this));

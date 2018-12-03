@@ -7,6 +7,7 @@ import { PRIORITY_QUEUE } from '../queue/task';
 import { UploaderTask } from '../sync/task/UploaderTask';
 import { Environment } from '../config/env';
 import { Upaki, UpakiArchiveList, UpakiUserProfile } from 'upaki-cli';
+import { Logger } from './Logger';
 
 export namespace Util {
     /**
@@ -39,6 +40,14 @@ export namespace Util {
 
     export function getPathNameFromFile(folderPath) {
         return path.dirname(folderPath);
+    }
+
+    export function elegantSize(bytes: any) {
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+        if (bytes === 0) return 'n/a'
+        const i = parseInt((Math.floor(Math.log(bytes) / Math.log(1024))) as any, 10)
+        if (i === 0) return `${bytes} ${sizes[i]}`
+        return `${(bytes / (1024 ** i)).toFixed(1)} ${sizes[i]}`
     }
 
     /**
@@ -86,6 +95,43 @@ export namespace Util {
         hash.update(buffer);
         return hash.digest('hex');
     };
+
+    export function getIPAddress() {
+        var interfaces = require('os').networkInterfaces();
+        for (var devName in interfaces) {
+            var iface = interfaces[devName];
+
+            for (var i = 0; i < iface.length; i++) {
+                var alias = iface[i];
+                if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal)
+                    return alias.address;
+            }
+        }
+
+        return '0.0.0.0';
+    }
+
+    export function Etagv2(filename, algorithm = 'md5') {
+        return new Promise((resolve, reject) => {
+            // Algorithm depends on availability of OpenSSL on platform
+            // Another algorithms: 'sha1', 'md5', 'sha256', 'sha512' ...
+            let shasum = crypto.createHash(algorithm);
+            try {
+                let s = fs.createReadStream(filename);
+                s.on('data', function (data) {
+                    shasum.update(data)
+                })
+                // making digest
+                s.on('end', function () {
+                    const hash = shasum.digest('hex')
+                    return resolve(hash);
+                })
+            } catch (error) {
+                Logger.error(error);
+                return resolve('');
+            }
+        });
+    }
 
     export function getFileNameByFullPath(fullPath) {
         if (fullPath == undefined) {

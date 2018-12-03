@@ -31,6 +31,14 @@ export class SystemWorker<T> {
         return this.modelProcess;
     }
 
+    get pData() {
+        return this.model.pdata;
+    }
+
+    async LoadData() {
+        this.model = await EntityTask.Instance.getTask<T>(this.pname);
+    }
+
     set model(model) {
         this.modelProcess = model;
         this.modelProcess.pstate = ProcTaskState.STARTED;
@@ -39,6 +47,7 @@ export class SystemWorker<T> {
 
     protected async DefaultListem(msg: any) {
         if (msg === 'shutdown') {
+            this.OnShuttdown();
             this.modelProcess.pstate = ProcTaskState.STOPPED;
             try {
                 Logger.info(`Shuttdown received in pid ${process.pid}`);
@@ -65,6 +74,8 @@ export class SystemWorker<T> {
 
         this.Listen(msg);
     }
+
+    public OnShuttdown(){}
 
     async SaveData() {
         try {

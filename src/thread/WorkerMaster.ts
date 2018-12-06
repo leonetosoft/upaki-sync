@@ -82,7 +82,8 @@ export class WorkerMaster {
                     ip: '-.-.-.-',
                     ready: false
                 },
-                pstate: ProcTaskState.STOPPED
+                pstate: ProcTaskState.STOPPED,
+                autostart: 1
             };
 
             this.forkProcess(task, true, (err, worker) => {
@@ -109,7 +110,8 @@ export class WorkerMaster {
                     path: [],
                     state: ScanDownloadState.CREATED
                 },
-                pstate: ProcTaskState.STOPPED
+                pstate: ProcTaskState.STOPPED,
+                autostart: 0
             };
 
             if (pname) {
@@ -146,8 +148,12 @@ export class WorkerMaster {
     public async StopTask(pname: string): Promise<any> {
         let indexOfProc = this.PROCESS_LIST.findIndex(el => el.pname === pname);
         if (indexOfProc !== -1) {
-            await this.ShutdownWorkers(this.PROCESS_LIST[indexOfProc].sender, this.PROCESS_LIST[indexOfProc].WORKER);
-            this.PROCESS_LIST.splice(indexOfProc, 1);
+            try {
+                await this.ShutdownWorkers(this.PROCESS_LIST[indexOfProc].sender, this.PROCESS_LIST[indexOfProc].WORKER);
+                // this.PROCESS_LIST.splice(indexOfProc, 1);
+            } catch (error) {
+                throw new Error(`Process task ${pname} not found or not started!`);
+            }
         } else {
             throw new Error(`Process task ${pname} not found or not started!`);
         }
@@ -219,7 +225,7 @@ export class WorkerMaster {
                     proc.ready = true;
                     Logger.info(`Process task ${newProcess.pname} identified by ${newProcess.pname} is ready!`);
                     let indexOfProc = this.PROCESS_LIST.findIndex(el => el.pname === newProcess.pname);
-                    if(indexOfProc === -1){
+                    if (indexOfProc === -1) {
                         this.PROCESS_LIST.push(proc);
                     }
                     callback(undefined, proc);
@@ -246,12 +252,17 @@ export class WorkerMaster {
             workerSender.send('shutdown');
 
             timeout = setTimeout(() => {
-                worker.disconnect();
-                Logger.info(`Send shutdown and close IPC Channel, await disconnect event ${worker.process.pid} ...`);
-                Logger.warn(`Process force disconnection ${worker.process.pid} ...`);
-                worker.kill();
-                resolve(worker.process.pid);
-            }, 2000);
+                try {
+                    worker.disconnect();
+                    Logger.info(`Send shutdown and close IPC Channel, await disconnect event ${worker.process.pid} ...`);
+                    Logger.warn(`Process force disconnection ${worker.process.pid} ...`);
+                    worker.kill(); 
+                } catch (error) {
+                    Logger.error(error);
+                } finally{
+                    resolve(worker.process.pid);
+                }
+            }, 5000);
 
             worker.on('disconnect', () => {
                 worker.disconnect();
@@ -261,6 +272,26 @@ export class WorkerMaster {
                 resolve(worker.process.pid);
             });
         });
+    }
+
+    async ForkAutoStartTasks() {
+        try {
+            let tasksNames = await EntityTask.Instance.ListAutoStartTasks();
+            for (let pname of tasksNames) {
+                try {
+                    let task = await EntityTask.Instance.getTask(pname);
+                    if (task) {
+                        await this.StartTask(task.pname);
+                    }
+                } catch (error) {
+                    Logger.warn(`Failed to start auto task ${pname} ... details: ${error.message}`);
+                    Logger.error(error);
+                }
+
+            }
+        } catch (errorList) {
+            Logger.error(errorList);
+        }
     }
 
     CloseAllProcess() {
@@ -383,6 +414,8 @@ export class WorkerMaster {
 
             this.ProcessStarted();
             this.ListenShutdownClusters();
+
+            this.ForkAutoStartTasks();
 
             if (onInit)
                 onInit();
@@ -587,10 +620,10 @@ export class WorkerMaster {
         let shutdown = async () => {
             Logger.info('Shutting down workers...');
 
-         /*   this.WORKER_PROCESS_FILE_SENDER.send('shutdown');
-            this.WORKER_UPLOAD_SENDER.send('shutdown');
-            this.WORKER_SOCKET_SENDER.send('shutdown');
-            this.WORKER_SCAN_PROCESS_SENDER.send('shutdown');*/
+            /*   this.WORKER_PROCESS_FILE_SENDER.send('shutdown');
+               this.WORKER_UPLOAD_SENDER.send('shutdown');
+               this.WORKER_SOCKET_SENDER.send('shutdown');
+               this.WORKER_SCAN_PROCESS_SENDER.send('shutdown');*/
 
             await this.CloseAllProcess();
         };

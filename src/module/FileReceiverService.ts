@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Util } from '../util/Util';
 import * as http from "http";
+import * as cluster from 'cluster';
 
 export interface FileReceiverServiceEvents {
     on(event: 'onCompleteFile', listener: (filename: string, size: number) => void): this;
@@ -153,7 +154,9 @@ export class FileReceiverService extends FileReceiverServiceEvents {
                 }
             })
         });
-
+        this.app.get('/test', async (req, res) => {
+            res.send(`worker ${cluster.worker.id} is listening on port ${this.port}...`);
+        });
         this.app.post('/single', async (req, res) => {
             upload.single('data')(req, res, async (err) => {
                 if (err instanceof (multer as any).MulterError) {

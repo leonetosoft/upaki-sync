@@ -26,7 +26,7 @@ export class EntityTask {
                         if (errTaskData) {
                             reject(errTaskData);
                         } else {
-                            Database.Instance.Run(`UPDATE task SET pdata=?, pstate=?, ptype=?, pdesc=? WHERE pname = ? and user_id=?`, [source, task.pstate, task.ptype, task.pdesc, task.pname, Environment.config.credentials.userId], (errInsert) => {
+                            Database.Instance.Run(`UPDATE task SET pdata=?, pstate=?, ptype=?, pdesc=?, autostart=? WHERE pname = ? and user_id=?`, [source, task.pstate, task.ptype, task.pdesc, task.pname, Environment.config.credentials.userId], (errInsert) => {
                                 if (errInsert) {
                                     reject(errInsert);
                                     return;
@@ -38,7 +38,8 @@ export class EntityTask {
                                 pstate: task.pstate,
                                 pdesc: task.pdesc,
                                 ptype: task.ptype,
-                                pdata: undefined
+                                pdata: undefined,
+                                autostart: task.autostart
                             }, source);
                         }
                     });
@@ -55,7 +56,7 @@ export class EntityTask {
                         if (errTaskData) {
                             reject(errTaskData);
                         } else {
-                            Database.Instance.Run(`INSERT INTO task(pname, pdata, pstate, ptype, pdesc, user_id) VALUES(?,?,?,?,?,?)`, [task.pname, /*JSON.stringify(task.pdata)*/source, task.pstate, task.ptype, task.pdesc, Environment.config.credentials.userId], (errInsert) => {
+                            Database.Instance.Run(`INSERT INTO task(pname, pdata, pstate, ptype, pdesc, user_id, autostart) VALUES(?,?,?,?,?,?,?)`, [task.pname, /*JSON.stringify(task.pdata)*/source, task.pstate, task.ptype, task.pdesc, Environment.config.credentials.userId, task.autostart], (errInsert) => {
                                 if (errInsert) {
                                     reject(errInsert);
                                     return;
@@ -67,7 +68,8 @@ export class EntityTask {
                                 pstate: task.pstate,
                                 pdesc: task.pdesc,
                                 ptype: task.ptype,
-                                pdata: undefined
+                                pdata: undefined,
+                                autostart: task.autostart
                             }, source);
                         }
                     });
@@ -79,7 +81,7 @@ export class EntityTask {
 
     ListTasksOfType<T>(ptype: ProcessType): Promise<TaskModel<T>[]> {
         return new Promise((resolve, reject) => {
-            Database.Instance.All(`SELECT pname, pdata, pstate, ptype, pdesc FROM task WHERE ptype=? and user_id=?`, [ptype, Environment.config.credentials.userId], (err, rows: TaskModel<any>[]) => {
+            Database.Instance.All(`SELECT pname, pdata, pstate, ptype, pdesc, autostart FROM task WHERE ptype=? and user_id=?`, [ptype, Environment.config.credentials.userId], (err, rows: TaskModel<any>[]) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -97,6 +99,20 @@ export class EntityTask {
                     resolve(rows.map(el => {
                         el.pdata = undefined;
                         return el;
+                    }));
+                }
+            });
+        })
+    }
+
+    ListAutoStartTasks(): Promise<string[]> {
+        return new Promise((resolve, reject) => {
+            Database.Instance.All(`SELECT pname FROM task WHERE autostart=1 and user_id=?`, [Environment.config.credentials.userId], (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows.map(el => {
+                        return el.pname;
                     }));
                 }
             });
@@ -123,7 +139,7 @@ export class EntityTask {
 
     getTask<T>(pname: string): Promise<TaskModel<T>> {
         return new Promise<TaskModel<T>>((resolve, reject) => {
-            Database.Instance.Get(`SELECT pname, pdata, pstate, ptype, pdesc FROM task WHERE pname=? and user_id=?`, [pname, Environment.config.credentials.userId], (err, row) => {
+            Database.Instance.Get(`SELECT pname, pdata, pstate, ptype, pdesc, autostart FROM task WHERE pname=? and user_id=?`, [pname, Environment.config.credentials.userId], (err, row) => {
                 if (err) {
                     reject(err);
                     return;
@@ -142,7 +158,8 @@ export class EntityTask {
                             pname: row.pname,
                             pstate: row.pstate,
                             pdesc: row.pdesc,
-                            ptype: row.ptype
+                            ptype: row.ptype,
+                            autostart: row.autostart
                         });
                     }
                 });

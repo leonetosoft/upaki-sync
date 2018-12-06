@@ -7,7 +7,7 @@ import { Util } from '../util/Util';
 import { MessageToWorker } from '../thread/UtilWorker';
 import * as uuidv1 from 'uuid/v1';
 import * as events from 'events';
-import { getSqlsStart } from './dbstart';
+import { getSqlsStart, dbMaintance } from './dbstart';
 import { WorkProcess } from '../api/thread';
 
 export enum TYPE_DB_EXECUTIONM {
@@ -36,13 +36,17 @@ export class Database {
         this.Connect();
     }
 
-    private CreationStartProm(sql: string) {
+    private CreationStartProm(sql: string, checkErrors = true) {
         return new Promise((resolve, reject) => {
             this.connection.run(sql, (rs, err) => {
-                if(err) {
-                    Logger.error(sql);
-                    Logger.error(err);
-                    reject(err);
+                if (checkErrors) {
+                    if (err) {
+                        Logger.error(sql);
+                        Logger.error(err);
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
                 }else{
                     resolve();
                 }
@@ -50,20 +54,22 @@ export class Database {
         });
     }
 
-     InitDatabase() {
+    InitDatabase() {
         return Promise.all(getSqlsStart().map(sql => {
             return this.CreationStartProm(sql);
-        }));
-       /* this.connection.run(`CREATE TABLE IF NOT EXISTS file (key NOT NULL, data TEXT, PRIMARY KEY ("key"))`, () => { });
-        this.connection.run(`CREATE TABLE IF NOT EXISTS folder (key NOT NULL, data TEXT,  PRIMARY KEY ("key"))`, () => { });
-        this.connection.run(`CREATE TABLE IF NOT EXISTS sync_folder (folder NOT NULL, PRIMARY KEY ("folder"))`, () => { });
-        this.connection.run(`CREATE TABLE task (pname TEXT NOT NULL, ptype INTEGER NOT NULL, pdata text, pstate INTEGER DEFAULT 0 NOT NULL, pdesc TEXT, PRIMARY KEY ("pname"))`, () => { });
-        this.connection.run(`CREATE TABLE credential (
-            device_id text NOT NULL,
-            credential_key text,
-            token text,
-            PRIMARY KEY ("device_id")
-        );`, () => { });*/
+        }).concat(dbMaintance().map(sql => {
+            return this.CreationStartProm(sql, false);
+        })));
+        /* this.connection.run(`CREATE TABLE IF NOT EXISTS file (key NOT NULL, data TEXT, PRIMARY KEY ("key"))`, () => { });
+         this.connection.run(`CREATE TABLE IF NOT EXISTS folder (key NOT NULL, data TEXT,  PRIMARY KEY ("key"))`, () => { });
+         this.connection.run(`CREATE TABLE IF NOT EXISTS sync_folder (folder NOT NULL, PRIMARY KEY ("folder"))`, () => { });
+         this.connection.run(`CREATE TABLE task (pname TEXT NOT NULL, ptype INTEGER NOT NULL, pdata text, pstate INTEGER DEFAULT 0 NOT NULL, pdesc TEXT, PRIMARY KEY ("pname"))`, () => { });
+         this.connection.run(`CREATE TABLE credential (
+             device_id text NOT NULL,
+             credential_key text,
+             token text,
+             PRIMARY KEY ("device_id")
+         );`, () => { });*/
     }
 
     public Run(sql: string, params: any[], callback?: (err: Error | null) => void) {

@@ -47,12 +47,17 @@ export class SystemWorker<T> {
 
     protected async DefaultListem(msg: any) {
         if (msg === 'shutdown') {
-            this.OnShuttdown();
-            this.modelProcess.pstate = ProcTaskState.STOPPED;
             try {
+                this.OnShuttdown();
+                if (this.modelProcess) {
+                    this.modelProcess.pstate = ProcTaskState.STOPPED;
+                }
+
                 Logger.info(`Shuttdown received in pid ${process.pid}`);
-                await this.SaveData();
-                Logger.info(`Data Saved in pid ${process.pid}`);
+                if (this.modelProcess) {
+                    await this.SaveData();
+                    Logger.info(`Data Saved in pid ${process.pid}`);
+                }
             } catch (error) {
                 Logger.error(error);
             } finally {
@@ -75,7 +80,7 @@ export class SystemWorker<T> {
         this.Listen(msg);
     }
 
-    public OnShuttdown(){}
+    public OnShuttdown() { }
 
     async SaveData() {
         try {

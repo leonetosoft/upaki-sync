@@ -14,6 +14,7 @@ export interface TaskModel<T> {
     pstate: ProcTaskState;
     ptype: ProcessType;
     pdata: T;
+    autostart: number;
 }
 
 export enum WorkProcess {

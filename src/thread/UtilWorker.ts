@@ -22,7 +22,7 @@ export function MessageToWorker(work: WorkProcess, msg: IMessageToWorker) {
 }
 
 export function Shutdown() {
-    process.exit(0);
+   process.exit(0);
     setTimeout(() => {
         process.exit(1);
     }, 5 * 1e+3)

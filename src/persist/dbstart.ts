@@ -10,5 +10,7 @@ export function getSqlsStart() {
 }
 
 export function dbMaintance() {
-    return [`ALTER TABLE task ADD COLUMN autostart INTEGER DEFAULT 0 NOT NULL`];
+    return [`ALTER TABLE task ADD COLUMN autostart INTEGER DEFAULT 0 NOT NULL`,
+        `ALTER TABLE sync_folder ADD delete_file INTEGER DEFAULT 0 NOT NULL`,
+        `ALTER TABLE sync_folder ADD delete_on_finish INTEGER DEFAULT 0 NOT NULL`];
 }

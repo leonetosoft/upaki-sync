@@ -54,6 +54,7 @@ import { WorkerDownload } from './thread/WorkerDownload';
 import { WorkProcess, ProcessType } from './api/thread';
 import { Database } from './persist/Database';
 import { WorkerFileReceiver } from './thread/WorkerFileReceiver';
+import { WorkerCopyDir } from './thread/WorkerCopyDir';
 
 export function BootSync(config: Config, onInit?: (err?) => void) {
     // Environment.config = config;
@@ -90,6 +91,10 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
 
                 case ProcessType.FILE_RECEIVER:
                     WorkerFileReceiver.Instance.InitService();
+                    break;
+
+                case ProcessType.FILE_COPY:
+                    WorkerCopyDir.Instance.Init();
                     break;
             }
         } else {

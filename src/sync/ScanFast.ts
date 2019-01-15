@@ -63,9 +63,15 @@ export function ScanFast(src, callbackTest: ((pathOfFile: string) => boolean), l
                 let filePath = path.resolve(src, item);
                 let fileStat = fs.lstatSync(filePath);
                 if (fileStat) {
-                    if (callbackTest && callbackTest(filePath)) {
-                        return { filePath: filePath, lstat: fileStat };
-                    } else {
+                    if (!fileStat.isDirectory()) {
+                        if (callbackTest && callbackTest(filePath)) {
+                            return { filePath: filePath, lstat: fileStat };
+                        } else if (!callbackTest) {
+                            return { filePath: filePath, lstat: fileStat };
+                        } else {
+                            return undefined;
+                        }
+                    }else {
                         return { filePath: filePath, lstat: fileStat };
                     }
                 } else {

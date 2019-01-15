@@ -35,7 +35,7 @@ export class WorkerWatcher extends SystemWorker<any> {
     AddWatch(src) {
         let sync = new SyncDataNative(src);
         sync.StartWhatch();
-
+        Logger.info(`Folder ${src} on whatch`);
         this.watchers.push({
             path: src,
             watcher: sync

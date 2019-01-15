@@ -15,6 +15,8 @@ import { Database } from '../persist/Database';
 import { PendingFolder } from '../api/download';
 import { WorkerProcess, TaskModel, ProcessType, WorkProcess, ProcTaskState } from '../api/thread';
 import { FileReceiverProcData } from '../api/filereceiver';
+import { CopyDirProcData } from '../api/copydir';
+import { Util } from '../util/Util';
 // import { UploadList } from '../ipc/IPCInterfaces';
 /*export class testBing implements UIEvents {
     UploadList(list: UploadList) {
@@ -124,8 +126,34 @@ export class WorkerMaster {
                 } else {
                     resolve(worker);
                 }
-            }, forcesave)
+            }, forcesave);
         })
+    }
+
+    public async StartCopy(sourceDir: string, availableExtensions: string[], cut: boolean) {
+        return new Promise((resolve, reject) => {
+            let task: TaskModel<CopyDirProcData> = {
+                pdesc: 'Copiar ' + Util.getFolderNameByPath(sourceDir),
+                ptype: ProcessType.FILE_COPY,
+                pdata: {
+                    sourceDir: sourceDir,
+                    removeOnCopy: cut,
+                    eventInfo: [],
+                    fileInfo: '',
+                    availableExtensions: availableExtensions
+                },
+                pstate: ProcTaskState.STOPPED,
+                autostart: 0
+            };
+
+            this.forkProcess(task, true, (err, worker) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(worker);
+                }
+            }, true);
+        });
     }
 
     public async StartTask(pname: string): Promise<WorkerProcess> {
@@ -256,10 +284,10 @@ export class WorkerMaster {
                     worker.disconnect();
                     Logger.info(`Send shutdown and close IPC Channel, await disconnect event ${worker.process.pid} ...`);
                     Logger.warn(`Process force disconnection ${worker.process.pid} ...`);
-                    worker.kill(); 
+                    worker.kill();
                 } catch (error) {
                     Logger.error(error);
-                } finally{
+                } finally {
                     resolve(worker.process.pid);
                 }
             }, 5000);

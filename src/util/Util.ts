@@ -133,6 +133,70 @@ export namespace Util {
         });
     }
 
+    export function rmdirAsync(path, callback) {
+        fs.readdir(path, function(err, files) {
+          if (err) {
+            // Pass the error on to callback
+            callback(err, []);
+            return;
+          }
+          var wait = files.length,
+            count = 0,
+            folderDone = function(err) {
+              count++;
+              // If we cleaned out all the files, continue
+              if (count >= wait || err) {
+                fs.rmdir(path, callback);
+              }
+            };
+          // Empty directory to bail early
+          if (!wait) {
+            folderDone(undefined);
+            return;
+          }
+      
+          // Remove one or more trailing slash to keep from doubling up
+          path = path.replace(/\/+$/, "");
+          files.forEach(function(file) {
+            var curPath = path + "/" + file;
+            fs.lstat(curPath, function(err, stats) {
+              if (err) {
+                callback(err, []);
+                return;
+              }
+              if (stats.isDirectory()) {
+                rmdirAsync(curPath, folderDone);
+              } else {
+                fs.unlink(curPath, folderDone);
+              }
+            });
+          });
+        });
+      };
+
+    export function cleanEmptyFoldersRecursively(folder) {
+        var isDir = fs.statSync(folder).isDirectory();
+        if (!isDir) {
+          return;
+        }
+        var files = fs.readdirSync(folder);
+        if (files.length > 0) {
+          files.forEach(function(file) {
+            var fullPath = path.join(folder, file);
+            cleanEmptyFoldersRecursively(fullPath);
+          });
+    
+          // re-evaluate files; after deleting subfolder
+          // we may have parent folder empty now
+          files = fs.readdirSync(folder);
+        }
+    
+        if (files.length == 0) {
+          fs.rmdirSync(folder);
+          return;
+        }
+      }
+
     export function getFileNameByFullPath(fullPath) {
         if (fullPath == undefined) {
             return undefined;
@@ -219,6 +283,10 @@ export namespace Util {
         return process.env.APPDATA || (process.platform == 'darwin' ? process.env.HOME + 'Library/Preferences' : '/var/local');
     }
 
+    export function getFolderSend() {
+        return path.join(getAppData(), getUpakiFolder(), 'tempSync');
+    }
+
     export function ReadTaskData<T>(taskName, callback: (err: NodeJS.ErrnoException, cacheSource: T, source) => void) {
         let source = path.join(getTaskStoreSource(), taskName);
         fs.readFile(source, 'utf8', (err, data) => {
@@ -240,32 +308,15 @@ export namespace Util {
     }
 
     export function getAbsolutePath(folderPath, rootFolder/*, baseFolder = os.hostname()*/) {
-        /*folderPath = folderPath.replace('\\', '/');
-        rootFolder = rootFolder.replace('\\', '/');*/
-        // let filedir = folderPath.match(/(.*)[\/\\]/)[1] || '';
-        // var re = new RegExp(rootFolder,"g");
-        // let abs = filedir.replace(re, "");
-        /*console.log('folder path = ', folderPath);
-        console.log('root path = ', rootFolder);
-        console.log('base = ', baseFolder);*/
         let srt = '';
         for (let i = 0; i < folderPath.length; i++) {
             if (folderPath[i] !== rootFolder[i]) {
                 srt += folderPath[i] === '\\' ? '/' : folderPath[i];
             }
         }
-        //baseFolder = baseFolder.replace(/\\/g, "/");
-        //let a  =path.join(baseFolder, srt);
-        //  console.log(path.join(baseFolder, srt));
-        // path.
-        /*if (abs != "") {
-            abs = abs.substring(1);
-            abs = abs.replace(/\\/g, "/");
-        }*/
-        // return path.join(srt, abs);
         if (srt[0] !== '/') {
             srt = addInStr(srt, 0, '/');
         }
-        return /*baseFolder +*/ srt /*path.join(baseFolder, srt)*/;
+        return srt;
     }
 }

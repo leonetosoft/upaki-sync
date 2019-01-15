@@ -4,6 +4,9 @@ import { Job } from "./../../queue/job";
 import { Environment } from '../../config/env';
 import { Logger } from '../../util/Logger';
 import { WorkerUpload } from '../../thread/WorkerUpload';
+import { EntityFolderSync } from '../../persist/entities/EntityFolderSync';
+import { Util } from '../../util/Util';
+import * as rmdir from 'rmdir';
 
 export class QueueUploader {
     private static _instance: QueueUploader;
@@ -25,6 +28,27 @@ export class QueueUploader {
                 job.Fail();
             }
         });
+    }
+
+    private async checkUploads(job: Job<UploaderTask>) {
+        if (await EntityFolderSync.Instance.DeleteOnFinish(job.task.file.rootFolder)) {
+            let totalSending = this.tasks.getTaskListByPriority().filter(el => el.task.file.rootFolder === job.task.file.rootFolder);
+            if (totalSending.length === 0) {
+                EntityFolderSync.Instance.DeleteFolder(job.task.file.rootFolder, (errDel) => {
+                    if (!errDel) {
+                        /*rmdir(job.task.file.rootFolder, (er, dirs, files) => {
+                            if (er) {
+                                Logger.error(er);
+                            } else {
+                                Logger.info(`Deleted ${dirs ? dirs.length : 0} directories and ${files ? files.length : 0} files`);
+                            }
+                        })*/
+                    } else {
+                        Logger.error(errDel);
+                    }
+                });
+            }
+        }
     }
 
 
@@ -59,6 +83,7 @@ export class QueueUploader {
         this.tasks.Event('taskUnQueue', (task) => {
             Logger.debug(`Upload File Process removed from queue id ${task.id}`);
             WorkerUpload.Instance.sendUploadList();
+            this.checkUploads(task);
         });
     }
     isAlreadyUploading(path) {

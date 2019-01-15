@@ -23,3 +23,9 @@ export interface EntityUploadData {
     Etag: string;
     path: string;
 }
+
+export interface SyncFolderObj {
+    folder: string;
+    delete_file: number;
+    delete_on_finish: number;
+}

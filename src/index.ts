@@ -31,6 +31,7 @@ export * from './api/download';
 export * from './api/thread';
 export * from './api/entity';
 export * from './api/filereceiver';
+export * from './api/copydir';
 
 // entity
 export * from './persist/Database';
@@ -62,7 +63,7 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
     if (cluster.isMaster) {
         PrintCredits();
         Environment.config.worker = WorkProcess.MASTER;
-        // Database.Instance.setMaster();
+        //Database.Instance.setMaster();
         if (Environment.config.credentials && Environment.config.credentials.credentialKey && Environment.config.credentials.secretToken) {
             WorkerMaster.Instance.InitV2(onInit);
         } else {
@@ -100,12 +101,10 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
         } else {
             switch (Number(process.env['DEFAULT_TYPE'])) {
                 case WorkProcess.WORKER_PROCESS_FILE:
-                    //Database.Instance.setMaster();
                     Environment.config.worker = WorkProcess.WORKER_PROCESS_FILE;
                     WorkerProcessFile.Instance.Init();
                     break;
                 case WorkProcess.WORKER_UPLOAD:
-                    //Database.Instance.setMaster();
                     Environment.config.worker = WorkProcess.WORKER_UPLOAD;
                     WorkerUpload.Instance.Init();
                     break;
@@ -114,47 +113,15 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
                     WorkerSocket.Instance.Init();
                     break;
                 case WorkProcess.WORKER_SCAN_PROCESS:
-                    //Database.Instance.setMaster();
                     Environment.config.worker = WorkProcess.WORKER_SCAN_PROCESS;
                     WorkerScanProcess.Instance.InitSync();
                     break;
                 case WorkProcess.WORKER_WHATCHER:
-                    //Database.Instance.setMaster();
                     Environment.config.worker = WorkProcess.WORKER_WHATCHER;
                     WorkerWatcher.Instance.Init();
                     break;
             }
         }
-        /*process.once('message', (msg) => {
-            if (msg.type === 'CONFIG_WORKER') {
-                switch (msg.work) {
-                    case WorkProcess.WORKER_PROCESS_FILE:
-                        //Database.Instance.setMaster();
-                        Environment.config.worker = WorkProcess.WORKER_PROCESS_FILE;
-                        WorkerProcessFile.Instance.Init();
-                        break;
-                    case WorkProcess.WORKER_UPLOAD:
-                        //Database.Instance.setMaster();
-                        Environment.config.worker = WorkProcess.WORKER_UPLOAD;
-                        WorkerUpload.Instance.Init();
-                        break;
-                    case WorkProcess.WORKER_SOCKET:
-                        Environment.config.worker = WorkProcess.WORKER_SOCKET;
-                        WorkerSocket.Instance.Init();
-                        break;
-                    case WorkProcess.WORKER_SCAN_PROCESS:
-                        //Database.Instance.setMaster();
-                        Environment.config.worker = WorkProcess.WORKER_SCAN_PROCESS;
-                        WorkerScanProcess.Instance.InitSync();
-                        break;
-                    case WorkProcess.WORKER_WHATCHER:
-                        //Database.Instance.setMaster();
-                        Environment.config.worker = WorkProcess.WORKER_WHATCHER;
-                        WorkerWatcher.Instance.Init();
-                        break;
-                }
-            }
-        });*/
 
         process.on('uncaughtException', (error) => {
             Logger.error(`uncaughtException Exception clusters`);

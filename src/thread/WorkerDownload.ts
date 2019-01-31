@@ -16,12 +16,6 @@ export class WorkerDownload extends SystemWorker<DownloadProcData> {
         super(WorkProcess.WORKER_DOWNLOAD, process.env['PNAME'])
     }
 
-    UpdateUiHandler() {
-        setInterval(async () => {
-            this.SaveData();
-        }, 1000);
-    }
-
     uiAction(queueId: string, action: DownloadUiAction, callback: (err, rs) => void) {
         let task = QueueDownload.Instance.tasks.getTaskById(queueId);
         if (!task) {

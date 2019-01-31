@@ -44,14 +44,6 @@ export class WorkerScanProcess extends SystemWorker<any> {
                 this.RequestScan();
                 break;
 
-            case 'DATABASE_RESPONSE':
-                Database.Instance.DbResponse(msg.data);
-                break;
-
-            case 'DATABASE':
-                Database.Instance.OnMessage(msg.data);
-                break;
-
             case 'SCANDIR':
                 this.ScanDir(msg.data);
                 break;

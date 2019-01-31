@@ -58,7 +58,12 @@ export class EntityFolderSync {
                 FunctionsBinding.Instance.AddScanDir(src);
                 FunctionsBinding.Instance.AddWatch(src);
             }
-            callback(err);
+
+            if(err && err.message && err.message.indexOf('SQLITE_CONSTRAINT') == -1) {
+                callback(err);
+            }else{
+                callback(undefined);
+            }
         });
     }
 

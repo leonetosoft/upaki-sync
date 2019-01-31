@@ -9,11 +9,26 @@ import * as uuidv1 from 'uuid/v1';
 import * as events from 'events';
 import { getSqlsStart, dbMaintance } from './dbstart';
 import { WorkProcess } from '../api/thread';
+import * as dgram from 'dgram';
 
-export enum TYPE_DB_EXECUTIONM {
+export enum TYPE_DB_EXECUTIOM {
     GET = 'GET',
     RUN = 'RUN',
     ALL = 'ALL'
+}
+
+export interface SqliteRequestPacket {
+    sql: string;
+    id: string;
+    worker: number;
+    params: any[];
+    type: TYPE_DB_EXECUTIOM;
+}
+
+export interface SqliteResponsePacket {
+    id: string;
+    rs: any;
+    err: string;
 }
 
 export class Database {
@@ -22,10 +37,14 @@ export class Database {
     private isDBMaster = false;
     private events: events.EventEmitter;
     private timeout = 5000;
+    private PORT = 33333;
+    private HOST = '127.0.0.1';
     private workerMain: WorkProcess = WorkProcess.WORKER_SCAN_PROCESS;
+    private server: dgram.Socket;
+    private client: dgram.Socket;
     constructor() {
         this.events = new events.EventEmitter();
-        this.setMaster();
+        // this.setMaster();
     }
     public static get Instance(): Database {
         return this._instance || (this._instance = new this());
@@ -33,7 +52,100 @@ export class Database {
 
     public setMaster() {
         this.isDBMaster = true;
+        this.startServer();
         this.Connect();
+    }
+
+    private startServer() {
+        this.server = dgram.createSocket('udp4');
+        this.server.on('listening', () => {
+            var address = this.server.address();
+            Logger.info('SQLITE Server listening on ' + address.address + ":" + address.port);
+        });
+        this.server.on('message', this.serverOnReceivePacket.bind(this));
+        this.server.bind(this.PORT, this.HOST);
+    }
+
+    private startClient() {
+        this.client = dgram.createSocket('udp4');
+        this.client.on('message', this.clientOnReceivePacket.bind(this));
+    }
+
+    private sendPacketToServer(msg: SqliteRequestPacket) {
+        if (this.isDBMaster) {
+            throw new Error('Send packet to server incorrect call in server mode');
+        }
+
+        if(!this.client) {
+            this.startClient();
+        }
+
+        let msgBuffer = Buffer.from(JSON.stringify(msg));
+        this.client.send(msgBuffer, 0, msgBuffer.length, this.PORT, this.HOST);
+    }
+
+    private sendPacketToClient(msg: SqliteResponsePacket, rinfo: dgram.AddressInfo) {
+        if (!this.isDBMaster) {
+            throw new Error('Send packet to client incorrect call in client mode');
+        }
+        let msgBuffer = Buffer.from(JSON.stringify(msg));
+        this.server.send(msgBuffer, 0, msgBuffer.length, rinfo.port, rinfo.address);
+    }
+
+    private clientOnReceivePacket(msg: Buffer, rinfo: dgram.AddressInfo) {
+        let packet = JSON.parse(msg.toString('utf8')) as SqliteResponsePacket;
+        this.events.emit(packet.id, packet.err ? new Error(packet.err) : undefined, packet.rs);
+    }
+
+    private serverOnReceivePacket(msg: Buffer, rinfo: dgram.AddressInfo) {
+        let packet = JSON.parse(msg.toString('utf8')) as SqliteRequestPacket;
+
+        switch (packet.type) {
+            case TYPE_DB_EXECUTIOM.RUN:
+                this.Run(packet.sql, packet.params, (err) => {
+                    /*if (err) {
+                        Logger.error(`Database Execution Error`);
+                        Logger.error(err);
+                    }*/
+
+                    this.sendPacketToClient({
+                        id: packet.id,
+                        rs: '',
+                        err: err ? err.message : undefined
+                    }, rinfo);
+                })
+                break;
+
+            case TYPE_DB_EXECUTIOM.GET:
+                this.Get(packet.sql, packet.params, (err, row) => {
+                    /*if (err) {
+                        Logger.error(`Database Execution Error`);
+                        Logger.error(err);
+                    }*/
+
+                    this.sendPacketToClient({
+                        id: packet.id,
+                        rs: row,
+                        err: err ? err.message : undefined
+                    }, rinfo);
+                })
+                break;
+
+            case TYPE_DB_EXECUTIOM.ALL:
+                this.All(packet.sql, packet.params, (err, row) => {
+                    /*if (err) {
+                        Logger.error(`Database Execution Error`);
+                        Logger.error(err);
+                    }*/
+
+                    this.sendPacketToClient({
+                        id: packet.id,
+                        rs: row,
+                        err: err ? err.message : undefined
+                    }, rinfo);
+                })
+                break;
+        }
     }
 
     private CreationStartProm(sql: string, checkErrors = true) {
@@ -47,7 +159,7 @@ export class Database {
                     } else {
                         resolve();
                     }
-                }else{
+                } else {
                     resolve();
                 }
             });
@@ -86,7 +198,10 @@ export class Database {
                     callback(new Error('Database Timeout error'));
                 }
             }, this.timeout);
-            MessageToWorker(this.workerMain, { type: 'DATABASE', data: { sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: 'RUN' } });
+
+            this.sendPacketToServer({
+                sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.RUN
+            });
         }
     }
 
@@ -104,7 +219,10 @@ export class Database {
                     callback(new Error('Database Timeout error'), undefined);
                 }
             }, this.timeout);
-            MessageToWorker(this.workerMain, { type: 'DATABASE', data: { sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: 'GET' } });
+
+            this.sendPacketToServer({
+                sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.GET
+            });
         }
     }
 
@@ -122,58 +240,12 @@ export class Database {
                     callback(new Error('Database Timeout error'), undefined);
                 }
             }, this.timeout);
-            MessageToWorker(this.workerMain, { type: 'DATABASE', data: { sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: 'ALL' } });
+           
+            this.sendPacketToServer({
+                sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.ALL
+            });
         }
     }
-
-    public DbResponse(data: { id: string, rs: any, err: boolean }) {
-        this.events.emit(data.id, data.err ? new Error(`Execution DB Error, id = ${data.id}`) : undefined, data.rs);
-    }
-
-    public OnMessage(data: { sql: string, id: string, worker: WorkProcess, params: any[], type: TYPE_DB_EXECUTIONM }) {
-        switch (data.type) {
-            case 'RUN':
-                this.Run(data.sql, data.params, (err) => {
-                    if (err) {
-                        Logger.error(`Database Execution Error`);
-                        Logger.error(err);
-                    }
-                    MessageToWorker(data.worker, {
-                        type: 'DATABASE_RESPONSE',
-                        data: { id: data.id, rs: '', err: err ? true : false }
-                    });
-                })
-                break;
-
-            case 'GET':
-                this.Get(data.sql, data.params, (err, row) => {
-                    if (err) {
-                        Logger.error(`Database Execution Error`);
-                        Logger.error(err);
-                    }
-                    MessageToWorker(data.worker, {
-                        type: 'DATABASE_RESPONSE',
-                        data: { id: data.id, rs: row, err: err ? true : false }
-                    });
-                })
-                break;
-
-            case 'ALL':
-                this.All(data.sql, data.params, (err, row) => {
-                    if (err) {
-                        Logger.error(`Database Execution Error`);
-                        Logger.error(err);
-                    }
-                    MessageToWorker(data.worker, {
-                        type: 'DATABASE_RESPONSE',
-                        data: { id: data.id, rs: row, err: err ? true : false }
-                    });
-                })
-                break;
-        }
-
-    }
-
 
     private Connect() {
         try {
@@ -191,11 +263,4 @@ export class Database {
             Logger.error(error);
         }
     }
-
-    /*public get con(): sqlite3.Database {
-        if (!this.connection) {
-            this.Connect();
-        }
-        return this.connection;
-    }*/
 }

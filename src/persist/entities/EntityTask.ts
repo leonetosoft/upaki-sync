@@ -2,7 +2,7 @@ import { Database } from "../Database";
 import { Util } from "../../util/Util";
 import { Logger } from "../../util/Logger";
 import { UIFunctionsBinding } from "../../ipc/UIFunctionsBinding";
-import { TaskModel, ProcessType } from "../../api/thread";
+import { TaskModel, ProcessType, TaskEvent } from "../../api/thread";
 import { Environment } from "../../config/env";
 
 export class EntityTask {
@@ -122,14 +122,19 @@ export class EntityTask {
     public Delete(pname: string) {
         return new Promise((resolve, reject) => {
             Util.DumpTaskData(pname, (errDel) => {
-                if(errDel){
+                if (errDel) {
                     reject(errDel);
                     return;
                 }
                 Database.Instance.Run('DELETE FROM task WHERE pname=? and user_id=?', [pname, Environment.config.credentials.userId], (err) => {
-                    if(err){
+                    if (err) {
                         reject(err);
-                    }else{
+                    } else {
+                        try {            
+                            UIFunctionsBinding.Instance.OnTaskEvent(TaskEvent.TASK_DELETE, pname);
+                        } catch (errorUpdate) {
+                            Logger.error(errorUpdate);
+                        }
                         resolve();
                     }
                 });

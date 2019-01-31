@@ -1,7 +1,7 @@
 import { SharedFuncion } from "./EventBinding";
 import { UploadList } from "./IPCInterfaces";
 import { WorkerMaster } from "../thread/WorkerMaster";
-import { WorkProcess, TaskModel } from "../api/thread";
+import { WorkProcess, TaskModel, TaskEvent } from "../api/thread";
 
 
 export class UIFunctionsBinding {
@@ -48,6 +48,16 @@ export class UIFunctionsBinding {
     UpdateTaskDefinition(task: TaskModel<any>, cacheSource: string) {
         WorkerMaster.Instance.implUi.forEach((el) => {
             el.UpdateTaskDefinition(task, cacheSource);
+        });
+    }
+
+    @SharedFuncion({
+        mainWorter: WorkProcess.MASTER,
+        response: false
+    })
+    OnTaskEvent(eventType: TaskEvent, pname: string) {
+        WorkerMaster.Instance.implUi.forEach((el) => {
+            el.OnTaskEvent(eventType, pname);
         });
     }
 

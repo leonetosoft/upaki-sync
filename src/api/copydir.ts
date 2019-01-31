@@ -3,11 +3,12 @@ export enum CopyType {
     FILES = 2
 }
 export interface CopyDirProcData {
+    deviceName?: string;
     copyType?: CopyType;
     sourceDir: string;
     destDir?: string;
     removeOnCopy: boolean;
     eventInfo: string[];
-    fileInfo: string;
+    fileInfo: {name: string, size: number};
     availableExtensions: string[];
 }

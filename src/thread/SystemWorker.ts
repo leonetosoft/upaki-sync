@@ -6,7 +6,7 @@ import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
 import { createQueuedSender } from '../ipc/QueueSender';
 import { EntityTask } from '../persist/entities/EntityTask';
 import { Logger } from '../util/Logger';
-import { TaskModel, WorkProcess, ProcTaskState } from '../api/thread';
+import { TaskModel, WorkProcess, ProcTaskState, TaskEvent } from '../api/thread';
 
 export interface WorkerListeners {
     Listen: (msg: any) => void;
@@ -15,6 +15,7 @@ export interface WorkerListeners {
 export class SystemWorker<T> {
     workerP: WorkProcess;
     pname: string;
+    intervalUpdateUi;
     private modelProcess: TaskModel<T>;
     constructor(woker: WorkProcess, pname = undefined) {
         this.workerP = woker;
@@ -43,6 +44,12 @@ export class SystemWorker<T> {
         this.modelProcess = model;
         this.modelProcess.pstate = ProcTaskState.STARTED;
         this.MonitoreProcess();
+    }
+
+    UpdateUiHandler(time = 1000) {
+        this.intervalUpdateUi = setInterval(async () => {
+            this.SaveData();
+        }, time);
     }
 
     protected async DefaultListem(msg: any) {
@@ -110,10 +117,32 @@ export class SystemWorker<T> {
             return;
 
         setInterval(async () => {
-            if (this.model.pstate === ProcTaskState.COMPLETED || this.model.pstate === ProcTaskState.STOPPED) {
-                await this.SaveData();
-                Logger.warn(`Process ${process.pid} ${this.model.pstate === ProcTaskState.COMPLETED ? 'COMPLETED' : 'STOPPED'}`);
-                process.exit(1);
+            try {
+                if (this.model.pstate === ProcTaskState.COMPLETED || this.model.pstate === ProcTaskState.STOPPED) {
+                    await this.SaveData();
+                    if(this.intervalUpdateUi){
+                        clearInterval(this.intervalUpdateUi);
+                    }
+                    Logger.warn(`Process ${process.pid} ${this.model.pstate === ProcTaskState.COMPLETED ? 'COMPLETED' : 'STOPPED'}`);
+                    if (this.model.pstate === ProcTaskState.STOPPED) {
+                        UIFunctionsBinding.Instance.OnTaskEvent(TaskEvent.TASK_STOP, this.model.pname);
+                    } else {
+                        UIFunctionsBinding.Instance.OnTaskEvent(TaskEvent.TASK_COMPLETE, this.model.pname);
+                    }
+                    process.exit(1);
+                }
+
+                if (this.model.pstate === ProcTaskState.COMPLETED_DELETE) {
+                    await this.SaveData();
+                    if(this.intervalUpdateUi){
+                        clearInterval(this.intervalUpdateUi);
+                    }
+                    await EntityTask.Instance.Delete(this.model.pname);
+                    Logger.warn(`Process ${process.pid} Completed delete task`);
+                    process.exit(1);
+                }
+            } catch (error) {
+                Logger.error(error);
             }
         }, 1000);
     }

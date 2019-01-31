@@ -39,5 +39,13 @@ export enum ProcTaskState {
     STOPPED = 0,
     STARTED = 2,
     ERROR = 3,
-    COMPLETED = 4
+    COMPLETED = 4,
+    COMPLETED_DELETE = 5
+}
+
+export enum TaskEvent {
+    TASK_DELETE = 0,
+    TASK_COMPLETE = 1,
+    TASK_STOP = 2,
+    TASK_CREATE = 3 
 }

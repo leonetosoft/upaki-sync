@@ -17,12 +17,6 @@ export class WorkerFileReceiver extends SystemWorker<FileReceiverProcData> {
         return this._instance || (this._instance = new this());
     }
 
-    UpdateUiHandler() {
-        setInterval(async () => {
-            this.SaveData();
-        }, 1000);
-    }
-
     PutLogData(type, dta: string) {
         if (this.pData.eventLog.length > 100) {
             this.pData.eventLog = [];

@@ -142,8 +142,8 @@ export class NSFW extends NativeEventsEmitter {
     }
 
     Stop() {
-        if(this.whatch) {
-            this.whatch.stop();
+        if (this.scan) {
+            this.scan.stop();
         }
     }
 

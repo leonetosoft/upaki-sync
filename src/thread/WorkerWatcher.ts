@@ -60,10 +60,6 @@ export class WorkerWatcher extends SystemWorker<any> {
 
                 break;
 
-            case 'DATABASE_RESPONSE':
-                Database.Instance.DbResponse(msg.data);
-                break;
-
             case 'ADD_WATCH':
                 this.AddWatch(msg.data);
                 break;

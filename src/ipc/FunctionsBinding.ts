@@ -180,4 +180,16 @@ export class FunctionsBinding {
         }
     }
 
+    @SharedFuncion({
+        mainWorter: WorkProcess.WORKER_UPLOAD,
+        response: false
+    })
+    RequestUpdateUiUpload() {
+        try {
+           WorkerUpload.Instance.UpdateUiList();
+        } catch (error) {
+            Logger.error(error);
+        }
+    }
+
 }

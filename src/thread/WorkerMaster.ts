@@ -13,7 +13,7 @@ import { EntityTask } from '../persist/entities/EntityTask';
 import { DownloadProcData, ScanDownloadState } from '../api/download';
 import { Database } from '../persist/Database';
 import { PendingFolder } from '../api/download';
-import { WorkerProcess, TaskModel, ProcessType, WorkProcess, ProcTaskState } from '../api/thread';
+import { WorkerProcess, TaskModel, ProcessType, WorkProcess, ProcTaskState, TaskEvent } from '../api/thread';
 import { FileReceiverProcData } from '../api/filereceiver';
 import { CopyDirProcData } from '../api/copydir';
 import { Util } from '../util/Util';
@@ -130,16 +130,17 @@ export class WorkerMaster {
         })
     }
 
-    public async StartCopy(sourceDir: string, availableExtensions: string[], cut: boolean) {
+    public async StartCopy(sourceDir: string, availableExtensions: string[], deviceName: string, cut: boolean) {
         return new Promise((resolve, reject) => {
             let task: TaskModel<CopyDirProcData> = {
-                pdesc: 'Copiar ' + Util.getFolderNameByPath(sourceDir),
+                pdesc: 'Copiar ' + !deviceName ? (Util.getFolderNameByPath(sourceDir) !== '' ? Util.getFolderNameByPath(sourceDir) : sourceDir) : deviceName,
                 ptype: ProcessType.FILE_COPY,
                 pdata: {
                     sourceDir: sourceDir,
                     removeOnCopy: cut,
-                    eventInfo: [],
-                    fileInfo: '',
+                    eventInfo: ['Inicializando processo de copia'],
+                    fileInfo: undefined,
+                    deviceName: deviceName,
                     availableExtensions: availableExtensions
                 },
                 pstate: ProcTaskState.STOPPED,
@@ -256,6 +257,13 @@ export class WorkerMaster {
                     if (indexOfProc === -1) {
                         this.PROCESS_LIST.push(proc);
                     }
+
+                    try {
+                        UIFunctionsBinding.Instance.OnTaskEvent(TaskEvent.TASK_CREATE, newProcess.pname);
+                    } catch (errBinding) {
+                        Logger.error(errBinding);
+                    }
+                    
                     callback(undefined, proc);
                 });
 

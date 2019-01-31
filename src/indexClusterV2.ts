@@ -2,8 +2,9 @@ import { development } from './config/development';
 import "reflect-metadata";
 import { Environment } from './config/env';
 import * as fs from 'fs';
-import { BootSync } from './index';
+import { BootSync, Database } from './index';
 import { EntityCredentials } from './persist/entities/EntityCredentials';
+import * as cluster from 'cluster';
 
 
 /*let arg = 0;
@@ -32,6 +33,10 @@ if (!Environment.config.credentials ||
     Environment.config.credentials = JSON.parse(credentialsLoad);
 }*/
 Environment.config = development;
+if (cluster.isMaster) {
+    Database.Instance.setMaster();
+    // Database.Instance.InitDatabase();
+}
 EntityCredentials.Instance.RestoreCredentialsFromDb().then(rs => {
     BootSync(Environment.config, (err) => {
         if (err) {

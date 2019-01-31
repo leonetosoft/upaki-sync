@@ -28,10 +28,14 @@ export class WorkerUpload extends SystemWorker<any> {
 
     UpdateUiHandler() {
         setInterval(() => {
-            if (QueueUploader.Instance.tasks.getTaskListByPriority().length !== 0) {
-                WorkerUpload.Instance.sendUploadList();
-            }
+            this.UpdateUiList();
         }, 5000);
+    }
+
+    UpdateUiList() {
+        if (QueueUploader.Instance.tasks.getTaskListByPriority().length !== 0) {
+            WorkerUpload.Instance.sendUploadList();
+        }
     }
 
     StartUpload(src, session: S3StreamSessionDetails, rootFolder: string) {

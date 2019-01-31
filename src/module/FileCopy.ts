@@ -42,9 +42,10 @@ export class FileCopy extends FileCopyEvents {
 
     Init() {
         this.scanner = ScanFast(this.sourcePath, (file) => {
-            if ((this.availableExtensions.length > 0 &&
+            if (((this.availableExtensions.length > 0 &&
                 this.availableExtensions.indexOf(Util.getExtension(file).toLowerCase()) !== -1) ||
-                (this.availableExtensions.length === 0)) {
+                (this.availableExtensions.length === 0)) && Util.getFileNameByPath(file) !== '' &&
+                 file.indexOf('System Volume Information') == -1) {
                 return true;
             } else {
                 return false;

@@ -175,14 +175,18 @@ export namespace Util {
       };
 
     export function cleanEmptyFoldersRecursively(folder) {
+        if(folder.indexOf('System Volume Information') !== -1) {
+            return;
+        }
         var isDir = fs.statSync(folder).isDirectory();
         if (!isDir) {
           return;
         }
         var files = fs.readdirSync(folder);
         if (files.length > 0) {
-          files.forEach(function(file) {
+          files.forEach((file) => {
             var fullPath = path.join(folder, file);
+            
             cleanEmptyFoldersRecursively(fullPath);
           });
     

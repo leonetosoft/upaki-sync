@@ -1,6 +1,6 @@
 {
   "name": "upaki-sync",
-  "version": "1.10.4",
+  "version": "1.10.8",
   "description": "Módulo de sincronização de dados upaki.com, sincronize seus dados facilmente",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

@@ -45,7 +45,7 @@ export class FileCopy extends FileCopyEvents {
             if (((this.availableExtensions.length > 0 &&
                 this.availableExtensions.indexOf(Util.getExtension(file).toLowerCase()) !== -1) ||
                 (this.availableExtensions.length === 0)) && Util.getFileNameByPath(file) !== '' &&
-                 file.indexOf('System Volume Information') == -1) {
+                 file.indexOf('System Volume Information') == -1 && Util.getExtension(file).toLowerCase().indexOf('lnk')) {
                 return true;
             } else {
                 return false;

@@ -11,6 +11,8 @@ import { EntityFolderMap } from '../../persist/entities/EntityFolderMap';
 import { WorkerUpload } from '../../thread/WorkerUpload';
 import { EntityFolderSync } from '../../persist/entities/EntityFolderSync';
 import * as fs from 'fs';
+import { EntityParameter } from '../../persist/entities/EntityParameter';
+import { STATUS } from '../../queue/stat';
 
 export enum UploadState {
     AWAIT = 'AWAIT',
@@ -38,6 +40,7 @@ export class UploaderTask extends Task {
     state: UploadState = UploadState.AWAIT;
     loaded: number;
     uploadType: UploadType = UploadType.SIMPLE;
+    compactContent: boolean;
 
     simpleUploadeEmitter: UploadEvents;
     multipartUploadEmitter: S3StreamEvents;
@@ -57,6 +60,8 @@ export class UploaderTask extends Task {
 
     timeStamp = Date.now();
     lastLoaded = 0;
+
+    parameters;
 
 
     // para upload de varias partes
@@ -96,8 +101,7 @@ export class UploaderTask extends Task {
             if (await EntityFolderSync.Instance.DeleteOnSend(this.file.rootFolder)) {
                 fs.unlinkSync(this.file.filePath);
                 await EntityUpload.Instance.delete(this.file.filePath);
-                console.log(this.file.rootFolder, ' === ', Util.getPathNameFromFile(this.file.filePath));
-                if(this.file.rootFolder !== Util.getPathNameFromFile(this.file.filePath)) {
+                if (this.file.rootFolder !== Util.getPathNameFromFile(this.file.filePath)) {
                     Util.cleanEmptyFoldersRecursively(Util.getPathNameFromFile(this.file.filePath));
                 }
             }
@@ -107,6 +111,11 @@ export class UploaderTask extends Task {
     }
 
     Cancel() {
+        if(this.job.stat === STATUS.FINISHED){
+            Logger.warn(`Request cancel uploading jog already finished ${this.file.getFullName()}`)
+            return;
+        }
+
         if (this.state === UploadState.STOP) {
             Logger.warn(`Request cancel uploading already STOPPED ${this.file.getFullName()}`)
             return;
@@ -115,12 +124,21 @@ export class UploaderTask extends Task {
         Logger.warn(`Request cancel uploading ${this.file.getFullName()}`);
 
         if (this.simpleUploadeEmitter || this.multipartUploadEmitter) {
+
+            
+            let deadLockCancel = setTimeout(() => {
+                Logger.warn(`Stop upload of ${this.file.getFullName()} deadlock cencel detected, force closing!!!`);
+                this.job.Finish();
+            }, 30000);
+
             this.state = UploadState.STOP;
             if (this.simpleUploadeEmitter) {
                 // this.state = UploadState.STOP;
                 this.simpleUploadeEmitter.once('aborted', () => {
                     //this.state = UploadState.STOP;
                     Logger.warn(`Job canceled, file changed ? ${this.file.getFullName()}`);
+                    clearTimeout(deadLockCancel);
+                    this.job.Finish();
                 })
                 this.simpleUploadeEmitter.emit('abort');
             } else {
@@ -128,6 +146,7 @@ export class UploaderTask extends Task {
                 this.multipartUploadEmitter.once('aborted', () => {
                     //this.state = UploadState.STOP;
                     Logger.warn(`Job canceled, file changed ? ${this.file.getFullName()}`);
+                    clearTimeout(deadLockCancel);
                     this.job.Finish();
                 })
                 this.multipartUploadEmitter.emit('abort');
@@ -302,7 +321,7 @@ export class UploaderTask extends Task {
                 WorkerUpload.Instance.notifyUpload(this);
             }
 
-            let compressContent = ['webm', 'mp4'].indexOf(this.file.getExtension().toLowerCase()) === -1;
+            let compressContent = ['webm', 'mp4'].indexOf(this.file.getExtension().toLowerCase()) === -1 && this.compactContent;
 
             let upload = await this.upaki.MultipartUpload(this.file.getPath(), this.file.getKey(), this.session, { maxPartSize: 5242880, concurrentParts: 1 }, {}, this.file.getLastModifies(), compressContent);
 
@@ -343,6 +362,9 @@ export class UploaderTask extends Task {
                         return;
                     }
                     this.save();
+                }else {
+                    Logger.error(`Unknow error in upload file ${this.file.getFullName()}`);
+                    Logger.error(error);
                 }
                 /*else if (error.code === 'CHECKSUM_ERROR') {
                     this.state = UploadState.ERROR;
@@ -359,7 +381,7 @@ export class UploaderTask extends Task {
                     }
                     this.numberErrors++;
                     this.job.Fail(Environment.config.queue.uploader.retryDelay);
-                    Logger.error(error.err);
+                    // Logger.error(error.err);
                 } else {
                     Logger.warn(`Upload ${this.file.getFullName()} upload STOPED`);
                 }
@@ -487,7 +509,16 @@ export class UploaderTask extends Task {
         // if (this.file.getSize() < 5242880) { // se menor que 5MB
         //     this.SinglePartUpload();
         //} else {
-        this.MultiplePartUpload();
+        if (!this.parameters) {
+            this.parameters = await EntityParameter.Instance.GetParams(['UPLOAD_TYPE', 'COMPACT_CONTENT_UPLOAD']);
+            this.compactContent = this.parameters['COMPACT_CONTENT_UPLOAD'] === '1' ? true : false;
+        }
+
+        if (this.parameters['UPLOAD_TYPE'] === 'PART') {
+            this.MultiplePartUpload();
+        } else {
+            this.SinglePartUpload();
+        }
         // }
     }
 }

@@ -34,7 +34,7 @@ export class SocketClient {
         });
 
         this.client.on('disconnect', () => {
-            Logger.error('Connection losed socked!');
+            Logger.warn('Connection losed socked!');
         })
     }
 

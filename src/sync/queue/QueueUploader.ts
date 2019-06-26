@@ -7,12 +7,13 @@ import { WorkerUpload } from '../../thread/WorkerUpload';
 import { EntityFolderSync } from '../../persist/entities/EntityFolderSync';
 import { Util } from '../../util/Util';
 import * as rmdir from 'rmdir';
+import { EntityParameter } from '../../persist/entities/EntityParameter';
 
 export class QueueUploader {
     private static _instance: QueueUploader;
     tasks: Processor<UploaderTask>;
     constructor() {
-        this.initTasks();
+        // this.initTasks();
     }
 
     public static get Instance(): QueueUploader {
@@ -52,14 +53,35 @@ export class QueueUploader {
     }
 
 
-    private initTasks() {
+    public async initTasks() {
+        let parameters = await EntityParameter.Instance.GetParams(['MAX_UPLOAD_QUEUE', 'MAX_RETRY_UPLOAD', 'UPLOAD_RETRY_DELAY']);
+        Logger.debug('========== UPLOAD PARAMETERS ==========');
+        Logger.debug(JSON.stringify(parameters));
         this.tasks = new Processor((jobs: Job<UploaderTask>[]) => {
             this.processJobs(jobs);
         }, {
-                taskSize: Environment.config.queue.uploader.taskSize,
+                /*taskSize: Environment.config.queue.uploader.taskSize,
                 maxRetries: Environment.config.queue.uploader.maxRetries,
-                retryDelay: Environment.config.queue.uploader.retryDelay
+                retryDelay: Environment.config.queue.uploader.retryDelay*/
+                taskSize: parseInt(parameters['MAX_UPLOAD_QUEUE']),
+                maxRetries: parseInt(parameters['MAX_RETRY_UPLOAD']),
+                retryDelay: parseInt(parameters['UPLOAD_RETRY_DELAY'])
             });
+
+        WorkerUpload.Instance.eventParams.on('MAX_UPLOAD_QUEUE', (value) => {
+            Logger.debug('Change MAX_UPLOAD_QUEUE to ' + value);
+            this.tasks.taskSize = parseInt(value);
+        });
+
+        WorkerUpload.Instance.eventParams.on('MAX_RETRY_UPLOAD', (value) => {
+            Logger.debug('Change MAX_RETRY_UPLOAD to ' + value);
+            this.tasks.maxRetries = parseInt(value);
+        });
+
+        WorkerUpload.Instance.eventParams.on('UPLOAD_RETRY_DELAY', (value) => {
+            Logger.debug('Change UPLOAD_RETRY_DELAY to ' + value);
+            this.tasks.retryDelay = parseInt(value);
+        });
 
         Logger.info(`[UploaderTask] - Queue initialized taskSize[${Environment.config.queue.uploader.taskSize}] maxRetries[${Environment.config.queue.uploader.maxRetries}] retryDelay[${Environment.config.queue.uploader.retryDelay}]`)
 

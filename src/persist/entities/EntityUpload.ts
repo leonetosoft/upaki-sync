@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import { Database } from '../Database';
 import { EntityUploadData } from '../../api/entity';
 import { Environment } from '../../config/env';
+import { Logger } from '../../util/Logger';
 
 export class EntityUpload {
     private static _instance: EntityUpload;
@@ -68,6 +69,12 @@ export class EntityUpload {
                     /*console.log(row);
                     console.log(paths);
                     console.log(keys);*/
+                    try {
+                        Logger.debug(row ? JSON.stringify(row) : `No row in getAnyFiles for path ${JSON.stringify(paths)}`);
+                    } catch (errWriteLog) {
+                        Logger.error(errWriteLog);
+                    }
+                    
                     if (row.length) {
                         resolve(row.map(el => {
                             return JSON.parse(el.data);

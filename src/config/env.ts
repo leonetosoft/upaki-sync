@@ -1,12 +1,25 @@
 export interface Config {
     version: string;
     useCluster: boolean;
+    ignoreLoggerParams: boolean;
     logging: {
         type: string[],
         warn: boolean,
         info: boolean,
         dbug: boolean,
         error: boolean
+    },
+    userProfile: {
+        busines_id: string;
+        email: string;
+        id: string;
+        name: string;
+        nickname: string;
+        view_first_on_order: string;
+        view_order_name_items: string;
+        view_share_user: string;
+        view_share_workgroup: string;
+        view_type: string;
     },
     synchPath: string,
     credentialsPath: string,
@@ -31,6 +44,11 @@ export interface Config {
             retryDelay: number;
         },
         downloadTask?: {
+            taskSize: number;
+            maxRetries: number;
+            retryDelay: number;
+        },
+        database: {
             taskSize: number;
             maxRetries: number;
             retryDelay: number;

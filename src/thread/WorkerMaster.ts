@@ -17,6 +17,7 @@ import { WorkerProcess, TaskModel, ProcessType, WorkProcess, ProcTaskState, Task
 import { FileReceiverProcData } from '../api/filereceiver';
 import { CopyDirProcData } from '../api/copydir';
 import { Util } from '../util/Util';
+import { BackupType, BackupProcData } from '../api/backup';
 // import { UploadList } from '../ipc/IPCInterfaces';
 /*export class testBing implements UIEvents {
     UploadList(list: UploadList) {
@@ -157,6 +158,49 @@ export class WorkerMaster {
         });
     }
 
+    /**
+     * @param sources Arquivos sources para backupear, aceita diretórios e arquivos
+     * @param dests Destinos para levar o backup
+     * @param backupName Nome do processo de backup
+     * @param backupType Tipo do backup
+     * FULL = 1,
+     * INCREMENTAL = 2,
+     * DIFERENCIAL = 3  
+     * @param compact true se for compactar a saída
+     * @param autostart 1 = inicia quando o programa abre e 0 não iniciar na abertura do programa
+     */
+    public async AddBackupTask(sources: string[],
+        dests: string[],
+        backupName: string,
+        backupType: BackupType,
+        compact: boolean,
+        autostart: 1|0 = 0) {
+
+        return new Promise((resolve, reject) => {
+            let task: TaskModel<BackupProcData> = {
+                pdesc: backupName,
+                ptype: ProcessType.BACKUP,
+                pdata: {
+                    sources: sources,
+                    dests: dests,
+                    backupType: backupType,
+                    compact: compact,
+                    eventLog : []
+                },
+                pstate: ProcTaskState.STOPPED,
+                autostart: autostart
+            };
+
+            this.forkProcess(task, true, (err, worker) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(worker);
+                }
+            }, true);
+        });
+    }
+
     public async StartTask(pname: string): Promise<WorkerProcess> {
         return new Promise<WorkerProcess>(async (resolve, reject) => {
             let taskStart = await EntityTask.Instance.getTask(pname);
@@ -185,6 +229,37 @@ export class WorkerMaster {
             }
         } else {
             throw new Error(`Process task ${pname} not found or not started!`);
+        }
+    }
+
+    public BroadcastMsg(type: string, data: any) {
+        let msg = {
+            type: type,
+            data: data
+        };
+
+        if (!this.isReady()) {
+            return;
+        }
+
+        try {
+            this.WORKER_SOCKET_SENDER.send(msg);
+            this.WORKER_SCAN_PROCESS_SENDER.send(msg);
+            this.WORKER_PROCESS_FILE_SENDER.send(msg);
+            this.WORKER_UPLOAD_SENDER.send(msg);
+            this.WORKER_WHATCHER_SENDER.send(msg);
+
+            for (let task of this.PROCESS_LIST) {
+                try {
+                    if (task.sender && task.ready) {
+                        task.sender.send(msg);
+                    }
+                } catch (error) {
+                    Logger.error(error);
+                }
+            }
+        } catch (error) {
+            Logger.error(error);
         }
     }
 
@@ -263,7 +338,7 @@ export class WorkerMaster {
                     } catch (errBinding) {
                         Logger.error(errBinding);
                     }
-                    
+
                     callback(undefined, proc);
                 });
 
@@ -407,6 +482,12 @@ export class WorkerMaster {
 
             newWorker.on('message', this.Listen.bind(this));
 
+            newWorker.on('message', (msg) => {
+                if(msg === 'WORKER_READY') {
+                    resolve([newWorker, sender]); 
+                }
+            });
+
             let timeout = setTimeout(() => {
                 reject(new Error('Processo demorou demais para ser iniciado'));
             }, 60000);
@@ -414,7 +495,7 @@ export class WorkerMaster {
             let sender = createQueuedSender(newWorker.process);
             newWorker.on('online', () => {
                 clearTimeout(timeout);
-                resolve([newWorker, sender]);
+                //resolve([newWorker, sender]);
             });
 
         })
@@ -591,8 +672,11 @@ export class WorkerMaster {
         }
     }
 
-    Listen(msg: any) {
+    Listen(msg: any, resolver) {
         try {
+            if(!msg.type) {
+                return;
+            }
             this.events.emit('message', msg);
             switch (msg.type) {
                 case 'TO_WORKER':

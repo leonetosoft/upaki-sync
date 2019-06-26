@@ -134,72 +134,72 @@ export namespace Util {
     }
 
     export function rmdirAsync(path, callback) {
-        fs.readdir(path, function(err, files) {
-          if (err) {
-            // Pass the error on to callback
-            callback(err, []);
-            return;
-          }
-          var wait = files.length,
-            count = 0,
-            folderDone = function(err) {
-              count++;
-              // If we cleaned out all the files, continue
-              if (count >= wait || err) {
-                fs.rmdir(path, callback);
-              }
-            };
-          // Empty directory to bail early
-          if (!wait) {
-            folderDone(undefined);
-            return;
-          }
-      
-          // Remove one or more trailing slash to keep from doubling up
-          path = path.replace(/\/+$/, "");
-          files.forEach(function(file) {
-            var curPath = path + "/" + file;
-            fs.lstat(curPath, function(err, stats) {
-              if (err) {
+        fs.readdir(path, function (err, files) {
+            if (err) {
+                // Pass the error on to callback
                 callback(err, []);
                 return;
-              }
-              if (stats.isDirectory()) {
-                rmdirAsync(curPath, folderDone);
-              } else {
-                fs.unlink(curPath, folderDone);
-              }
+            }
+            var wait = files.length,
+                count = 0,
+                folderDone = function (err) {
+                    count++;
+                    // If we cleaned out all the files, continue
+                    if (count >= wait || err) {
+                        fs.rmdir(path, callback);
+                    }
+                };
+            // Empty directory to bail early
+            if (!wait) {
+                folderDone(undefined);
+                return;
+            }
+
+            // Remove one or more trailing slash to keep from doubling up
+            path = path.replace(/\/+$/, "");
+            files.forEach(function (file) {
+                var curPath = path + "/" + file;
+                fs.lstat(curPath, function (err, stats) {
+                    if (err) {
+                        callback(err, []);
+                        return;
+                    }
+                    if (stats.isDirectory()) {
+                        rmdirAsync(curPath, folderDone);
+                    } else {
+                        fs.unlink(curPath, folderDone);
+                    }
+                });
             });
-          });
         });
-      };
+    };
 
     export function cleanEmptyFoldersRecursively(folder) {
-        if(folder.indexOf('System Volume Information') !== -1) {
+        if (folder.indexOf('System Volume Information') !== -1) {
             return;
         }
         var isDir = fs.statSync(folder).isDirectory();
         if (!isDir) {
-          return;
+            return;
         }
         var files = fs.readdirSync(folder);
         if (files.length > 0) {
-          files.forEach((file) => {
-            var fullPath = path.join(folder, file);
-            
-            cleanEmptyFoldersRecursively(fullPath);
-          });
-    
-          // re-evaluate files; after deleting subfolder
-          // we may have parent folder empty now
-          files = fs.readdirSync(folder);
+            files.forEach((file) => {
+                var fullPath = path.join(folder, file);
+
+                cleanEmptyFoldersRecursively(fullPath);
+            });
+
+            // re-evaluate files; after deleting subfolder
+            // we may have parent folder empty now
+            files = fs.readdirSync(folder);
         }
-    
+
         if (files.length == 0) {
-          fs.rmdirSync(folder);
-          return;
+            fs.rmdirSync(folder);
+            return;
         }
-      }
+    }
 
     export function getFileNameByFullPath(fullPath) {
         if (fullPath == undefined) {
@@ -235,6 +235,11 @@ export namespace Util {
     export async function getUserProfile(): Promise<UpakiUserProfile> {
         let upakiClient = new Upaki(Environment.config.credentials);
         let profile = await upakiClient.getUserProfile();
+        try {
+            Environment.config.userProfile = profile.data;
+        } catch (error) {
+            Logger.error(error);
+        }
         return profile.data;
     }
 
@@ -259,6 +264,21 @@ export namespace Util {
         let source = path.join(getTaskStoreSource());
         if (!fs.existsSync(source)) {
             fs.mkdirSync(source);
+        }
+
+        if(data === undefined || data === null) {
+            //Logger.error('Nenhum dado a ser gravado no banco da tarefa');
+            callback(new Error('Nenhum dado a ser gravado no banco da tarefa'), source);
+            return;
+        }
+
+        // testa se json é valido
+        try {
+            let destJson = JSON.stringify(data);
+            JSON.parse(destJson);
+        } catch (error) {
+            callback(error, source);
+            return;
         }
 
         source = path.join(source, cacheName);

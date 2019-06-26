@@ -9,9 +9,9 @@ import { Logger } from '../util/Logger';
 
 export class Processor<T extends Task> {
     private loopTime: number;
-    private retryDelay: number;
+    public retryDelay: number;
     public maxRetries: number;
-    private taskSize: number;
+    public taskSize: number;
     // private taskList: Job<T>[];
     private taskListHigh: Job<T>[];
     private taskListMedium: Job<T>[];
@@ -22,7 +22,7 @@ export class Processor<T extends Task> {
     private countProcessing = 0;
 
     constructor(fn, options) {
-        this.loopTime = options.loopTime || 1000;
+        this.loopTime = options.loopTime || 500;
         this.retryDelay = options.retryDelay || 1000;
         this.maxRetries = options.maxRetries || 1;
         this.taskSize = options.taskSize || 1;
@@ -154,7 +154,7 @@ export class Processor<T extends Task> {
                     this.countProcessing--;
                 }
                 else
-                    Logger.error(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
+                    Logger.warn(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
                 break;
 
             case PRIORITY_QUEUE.LOW:
@@ -164,7 +164,7 @@ export class Processor<T extends Task> {
                     this.countProcessing--;
                 }
                 else
-                    Logger.error(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
+                    Logger.warn(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
                 break;
 
             case PRIORITY_QUEUE.MEDIUM:
@@ -174,7 +174,7 @@ export class Processor<T extends Task> {
                     this.countProcessing--;
                 }
                 else
-                    Logger.error(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
+                    Logger.warn(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
                 break;
         }
 

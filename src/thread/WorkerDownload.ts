@@ -62,13 +62,13 @@ export class WorkerDownload extends SystemWorker<DownloadProcData> {
         }
     }
 
-    async UpdateData() {
+    /*async UpdateData() {
         try {
             await EntityTask.Instance.UpdateData(this.model);
         } catch (error) {
             Logger.error(error);
         }
-    }
+    }*/
 
     private OnCompleteScanFolder() {
         this.SaveData();

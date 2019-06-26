@@ -4,12 +4,16 @@ import * as sqlite3 from 'sqlite3';
 import * as mkdirp from 'mkdirp';
 import * as fs from 'fs';
 import { Util } from '../util/Util';
-import { MessageToWorker } from '../thread/UtilWorker';
 import * as uuidv1 from 'uuid/v1';
 import * as events from 'events';
-import { getSqlsStart, dbMaintance } from './dbstart';
+import { getSqlsStart, dbMaintance, getDefaultParameters } from './dbstart';
 import { WorkProcess } from '../api/thread';
 import * as dgram from 'dgram';
+import { EntityParameter } from './entities/EntityParameter';
+import { QueueDatabaseExecution } from './queue/QueueDatabaseExecution';
+import { DatabaseExecutionTask } from './queue/DatabaseExecutionTask';
+import * as net from 'net';
+import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
 
 export enum TYPE_DB_EXECUTIOM {
     GET = 'GET',
@@ -36,12 +40,17 @@ export class Database {
     private connection: sqlite3.Database;
     private isDBMaster = false;
     private events: events.EventEmitter;
-    private timeout = 5000;
+    private timeout = 30000;
     private PORT = 33333;
+    private startingClinetConnection = false;
     private HOST = '127.0.0.1';
     private workerMain: WorkProcess = WorkProcess.WORKER_SCAN_PROCESS;
-    private server: dgram.Socket;
-    private client: dgram.Socket;
+    /*private server: dgram.Socket;
+    private client: dgram.Socket;*/
+    private server: net.Server;
+    private client: net.Socket;
+    private connections: net.Socket[] = [];
+    private timeoutChecker = {};
     constructor() {
         this.events = new events.EventEmitter();
         // this.setMaster();
@@ -56,96 +65,214 @@ export class Database {
         this.Connect();
     }
 
-    private startServer() {
+    private startServer() {/*
         this.server = dgram.createSocket('udp4');
         this.server.on('listening', () => {
             var address = this.server.address();
             Logger.info('SQLITE Server listening on ' + address.address + ":" + address.port);
         });
         this.server.on('message', this.serverOnReceivePacket.bind(this));
-        this.server.bind(this.PORT, this.HOST);
+        this.server.bind(this.PORT, this.HOST);*/
+        this.server = net.createServer();
+
+        this.server.on('close', () => {
+            Logger.info(`Database server closed`);
+        });
+
+        this.server.on('connection', (socket) => {
+            socket.setEncoding('utf-8');
+            this.connections.push(socket);
+
+            socket.on('data', (data) => {
+                let dados = data.toString().split('\n');
+
+                for (let dadoSep of dados) {
+                    if (dadoSep === 'REQUEST_MAXIMIZE') {
+                        UIFunctionsBinding.Instance.UpakiRequestMaximize();
+                    }
+                    else if (dadoSep != '') {
+                        this.serverOnReceivePacket(dadoSep, socket);
+                    }
+                }
+
+
+            });
+
+            socket.on('end', () => {
+                this.connections.splice(this.connections.indexOf(socket), 1);
+                Logger.info(`Disconected ${socket.remotePort} `);
+            });
+
+
+            socket.on('close', (error) => {
+                Logger.info(`Closed ${socket.remotePort} `);
+            });
+
+            socket.on('error', (error) => {
+                Logger.error(error);
+            });
+        });
+
+        this.server.on('error', (error: any) => {
+            if (error.code === 'EADDRINUSE') {
+                console.log('erro');
+
+                var clMaximize = new net.Socket();
+                clMaximize = clMaximize.connect({
+                    port: this.PORT,
+                    host: this.HOST
+                });
+
+                clMaximize.on('connect', () => {
+                    clMaximize.write('REQUEST_MAXIMIZE\n');
+                    UIFunctionsBinding.Instance.UpakiAlreadyOpen();
+                });
+
+                } else {
+                        Logger.error(error);
+                    }
+        });
+
+        this.server.on('listening', () => {
+            Logger.info(`Server database listening`);
+        });
+
+        this.server.listen(this.PORT, this.HOST);
     }
 
     private startClient() {
-        this.client = dgram.createSocket('udp4');
-        this.client.on('message', this.clientOnReceivePacket.bind(this));
+        this.startingClinetConnection = true;
+        return new Promise((resolve, reject) => {
+            this.client = new net.Socket();
+            this.client.connect({
+                port: this.PORT,
+                host: this.HOST
+            });
+
+            this.client.on('connect', () => {
+                this.startingClinetConnection = false;
+                Logger.info('[Database TCP] Client: connection established with server');
+
+                var address = this.client.address();
+                var port = address.port;
+                var family = address.family;
+                var ipaddr = address.address;
+                Logger.info('[Database TCP] Client is listening at port' + port);
+                Logger.info('[Database TCP] Client ip :' + ipaddr);
+                Logger.info('[Database TCP] Client is IP4/IP6 : ' + family);
+
+                resolve();
+            });
+
+            this.client.setEncoding('utf8');
+
+            this.client.on('data', (data) => {
+                let dados = data.toString().split('\n');
+
+                for (let dadoSep of dados) {
+                    if (dadoSep != '') {
+                        this.clientOnReceivePacket(dadoSep);
+                    }
+                }
+
+            });
+
+            this.client.on('error', (data) => {
+                reject();
+            });
+        });
     }
 
-    private sendPacketToServer(msg: SqliteRequestPacket) {
+    private async sendPacketToServer(msg: SqliteRequestPacket) {
+        //Logger.assert(`${msg.id}: sendPacketToServer SQL: ${msg.sql} PARAMS: ${JSON.stringify(msg.params)} TYPE: ${msg.type}`);
         if (this.isDBMaster) {
             throw new Error('Send packet to server incorrect call in server mode');
         }
 
-        if(!this.client) {
-            this.startClient();
+        if (!this.client && !this.startingClinetConnection) {
+            await this.startClient();
+        }
+        else if (this.startingClinetConnection) {
+            setTimeout(() => {
+                this.sendPacketToServer(msg);
+            }, 1000);
+            return;
         }
 
-        let msgBuffer = Buffer.from(JSON.stringify(msg));
-        this.client.send(msgBuffer, 0, msgBuffer.length, this.PORT, this.HOST);
+        //let msgBuffer = Buffer.from(JSON.stringify(msg));
+        this.client.write(/*msgBuffer*/JSON.stringify(msg) + '\n');
     }
 
-    private sendPacketToClient(msg: SqliteResponsePacket, rinfo: dgram.AddressInfo) {
+    public sendPacketToClient(msg: SqliteResponsePacket, clientSocket: net.Socket) {
         if (!this.isDBMaster) {
             throw new Error('Send packet to client incorrect call in client mode');
         }
-        let msgBuffer = Buffer.from(JSON.stringify(msg));
-        this.server.send(msgBuffer, 0, msgBuffer.length, rinfo.port, rinfo.address);
+        clientSocket.write(JSON.stringify(msg) + '\n');
     }
 
-    private clientOnReceivePacket(msg: Buffer, rinfo: dgram.AddressInfo) {
-        let packet = JSON.parse(msg.toString('utf8')) as SqliteResponsePacket;
-        this.events.emit(packet.id, packet.err ? new Error(packet.err) : undefined, packet.rs);
+    private clientOnReceivePacket(msg: string) {
+        try {
+            //console.log(msg.toString('utf8'));
+            let packet = JSON.parse(msg) as SqliteResponsePacket;
+            // console.log('packet::', packet);
+            // console.log(`[${packet.id}] packet rs :: ${ packet.rs}`);
+            // Logger.assert(`${packet.id}: clientOnReceivePacket RESPOND: ${JSON.stringify(packet.rs)} ERR: ${packet.err}`);
+            clearTimeout(this.timeoutChecker[packet.id]);
+            delete this.timeoutChecker[packet.id];
+            this.events.emit(packet.id, packet.err ? new Error(packet.err) : undefined, packet.rs);
+        } catch (error) {
+            console.log(error);
+            Logger.error(error);
+        }
     }
 
-    private serverOnReceivePacket(msg: Buffer, rinfo: dgram.AddressInfo) {
-        let packet = JSON.parse(msg.toString('utf8')) as SqliteRequestPacket;
+    private serverOnReceivePacket(msg: string, clientSocket: net.Socket) {
+        let packet = JSON.parse(msg) as SqliteRequestPacket;
 
+        // Logger.assert(`${packet.id}: serverOnReceivePacket SQL: ${packet.sql} PARAMS: ${JSON.stringify(packet.params)} TYPE: ${packet.type}`);
+
+        /*if (packet.type === TYPE_DB_EXECUTIOM.RUN) {
+            let job = new DatabaseExecutionTask(packet, rinfo);
+            //job.priority = packet.type === TYPE_DB_EXECUTIOM.RUN ? PRIORITY_QUEUE.HIGH : PRIORITY_QUEUE.MEDIUM;
+            QueueDatabaseExecution.Instance.addJob(job);
+        } else {*/
         switch (packet.type) {
             case TYPE_DB_EXECUTIOM.RUN:
                 this.Run(packet.sql, packet.params, (err) => {
-                    /*if (err) {
-                        Logger.error(`Database Execution Error`);
-                        Logger.error(err);
-                    }*/
+
 
                     this.sendPacketToClient({
                         id: packet.id,
                         rs: '',
                         err: err ? err.message : undefined
-                    }, rinfo);
+                    }, clientSocket);
                 })
                 break;
 
             case TYPE_DB_EXECUTIOM.GET:
                 this.Get(packet.sql, packet.params, (err, row) => {
-                    /*if (err) {
-                        Logger.error(`Database Execution Error`);
-                        Logger.error(err);
-                    }*/
 
                     this.sendPacketToClient({
                         id: packet.id,
                         rs: row,
                         err: err ? err.message : undefined
-                    }, rinfo);
+                    }, clientSocket);
                 })
                 break;
 
             case TYPE_DB_EXECUTIOM.ALL:
                 this.All(packet.sql, packet.params, (err, row) => {
-                    /*if (err) {
-                        Logger.error(`Database Execution Error`);
-                        Logger.error(err);
-                    }*/
+
 
                     this.sendPacketToClient({
                         id: packet.id,
                         rs: row,
                         err: err ? err.message : undefined
-                    }, rinfo);
+                    }, clientSocket);
                 })
                 break;
         }
+        /*}*/
     }
 
     private CreationStartProm(sql: string, checkErrors = true) {
@@ -166,12 +293,47 @@ export class Database {
         });
     }
 
+    private checkDoubleProcess() {
+
+    }
+
     InitDatabase() {
-        return Promise.all(getSqlsStart().map(sql => {
+        /*return Promise.all(getSqlsStart().map(sql => {
             return this.CreationStartProm(sql);
         }).concat(dbMaintance().map(sql => {
             return this.CreationStartProm(sql, false);
-        })));
+        }).concat(EntityParameter.Instance.UpdateParameters(getDefaultParameters(), false))));*/
+        return Promise.all(getSqlsStart().map(sql => {
+            return this.CreationStartProm(sql);
+        })).then(rs => {
+            return Promise.all(dbMaintance().map(sql => {
+                return this.CreationStartProm(sql, false);
+            }));
+        }).then(rs => {
+            return EntityParameter.Instance.UpdateParameters(getDefaultParameters(), false);
+        }).then((rs) => {
+            return EntityParameter.Instance.GetParams(['LOGGER_TYPE',
+                'LOGGER_WARN',
+                'LOGGER_INFO',
+                'LOGGER_DBUG',
+                'LOGGER_ERROR'
+            ]);
+        }).then(params => {
+            if (Environment.config.ignoreLoggerParams) {
+                console.log('Params ignored ignoreLoggerParams = true');
+                return;
+            }
+            Environment.config.logging.type = params['LOGGER_TYPE'].split(',');
+            Environment.config.logging.warn = params['LOGGER_WARN'] === '1';
+            Environment.config.logging.info = params['LOGGER_INFO'] === '1';
+            Environment.config.logging.dbug = params['LOGGER_DBUG'] === '1';
+            Environment.config.logging.error = params['LOGGER_ERROR'] === '1';
+        });
+
+
+        /*.concat(dbMaintance().map(sql => {
+            return this.CreationStartProm(sql, false);
+        }).concat(EntityParameter.Instance.UpdateParameters(getDefaultParameters(), false))));*/
         /* this.connection.run(`CREATE TABLE IF NOT EXISTS file (key NOT NULL, data TEXT, PRIMARY KEY ("key"))`, () => { });
          this.connection.run(`CREATE TABLE IF NOT EXISTS folder (key NOT NULL, data TEXT,  PRIMARY KEY ("key"))`, () => { });
          this.connection.run(`CREATE TABLE IF NOT EXISTS sync_folder (folder NOT NULL, PRIMARY KEY ("folder"))`, () => { });
@@ -192,12 +354,16 @@ export class Database {
             let idRequest = uuidv1();
             Logger.debug(`Database Request Execution: ${sql}`);
             this.events.once(idRequest, callback);
-            setTimeout(() => {
+
+            this.timeoutChecker[idRequest] = setTimeout(() => {
                 let find = this.events.eventNames().find(el => el === idRequest);
                 if (find) {
-                    callback(new Error('Database Timeout error'));
+                    callback(new Error(`[${idRequest}] Database Timeout error - Timeout=${this.timeout} SQL-${sql ? sql : ''} PARAMS=${JSON.stringify(params)}`));
                 }
+
+                delete this.timeoutChecker[idRequest];
             }, this.timeout);
+
 
             this.sendPacketToServer({
                 sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.RUN
@@ -213,11 +379,14 @@ export class Database {
             let idRequest = uuidv1();
             Logger.debug(`Database Request Execution: ${sql}`);
             this.events.once(idRequest, callback);
-            setTimeout(() => {
+
+            this.timeoutChecker[idRequest] = setTimeout(() => {
                 let find = this.events.eventNames().find(el => el === idRequest);
                 if (find) {
-                    callback(new Error('Database Timeout error'), undefined);
+                    callback(new Error(`[${idRequest}]  Database Timeout error`), undefined);
                 }
+
+                delete this.timeoutChecker[idRequest];
             }, this.timeout);
 
             this.sendPacketToServer({
@@ -234,13 +403,16 @@ export class Database {
             let idRequest = uuidv1();
             Logger.debug(`Database Request Execution: ${sql}`);
             this.events.once(idRequest, callback);
-            setTimeout(() => {
+
+            this.timeoutChecker[idRequest] = setTimeout(() => {
                 let find = this.events.eventNames().find(el => el === idRequest);
                 if (find) {
-                    callback(new Error('Database Timeout error'), undefined);
+                    callback(new Error(`[${idRequest}]  Database Timeout error`), undefined);
                 }
+
+                delete this.timeoutChecker[idRequest];
             }, this.timeout);
-           
+
             this.sendPacketToServer({
                 sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.ALL
             });

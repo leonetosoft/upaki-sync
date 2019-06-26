@@ -6,6 +6,7 @@ import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
 import { createQueuedSender } from '../ipc/QueueSender';
 import { EntityTask } from '../persist/entities/EntityTask';
 import { Logger } from '../util/Logger';
+import * as events from 'events';
 import { TaskModel, WorkProcess, ProcTaskState, TaskEvent } from '../api/thread';
 
 export interface WorkerListeners {
@@ -16,7 +17,9 @@ export class SystemWorker<T> {
     workerP: WorkProcess;
     pname: string;
     intervalUpdateUi;
+    eventParams: events.EventEmitter;
     private modelProcess: TaskModel<T>;
+    private modelProcessOld: string;
     constructor(woker: WorkProcess, pname = undefined) {
         this.workerP = woker;
         this.pname = pname;
@@ -25,7 +28,9 @@ export class SystemWorker<T> {
         process.on('message', this.DefaultListem.bind(this));
         FunctionsBinding.Instance;
         UIFunctionsBinding.Instance;
+        this.eventParams = new events.EventEmitter();
         this.ProcessSignals();
+        ProcesSys.sender.send('WORKER_READY'); // envia uma mensagem avisando que esta tudo carregado
     }
 
     get model() {
@@ -82,6 +87,10 @@ export class SystemWorker<T> {
             case 'RECEIVE_CALL_RESPONSE':
                 SharedResponseCall(msg.data);
                 break;
+
+            case 'UPDATE_PARAMETERS':
+                this.eventParams.emit(msg.data.key, msg.data.value);
+                break;
         }
 
         this.Listen(msg);
@@ -89,12 +98,32 @@ export class SystemWorker<T> {
 
     public OnShuttdown() { }
 
-    async SaveData() {
+    async SaveData(force = false) {
         try {
-            await EntityTask.Instance.UpdateData(this.model);
+            if (force) {
+                await EntityTask.Instance.UpdateData(this.model);
+            } else {
+                if (this.hasChanges()) {
+                    await EntityTask.Instance.UpdateDataLight(this.model);
+                }
+            }
+
+            this.modelProcessOld = JSON.stringify(this.modelProcess);
         } catch (error) {
             Logger.error(error);
         }
+    }
+
+    private hasChanges(): boolean {
+        if (!this.modelProcessOld) {
+            return true;
+        }
+
+        if (this.modelProcess && JSON.stringify(this.modelProcess) !== JSON.stringify(this.modelProcessOld)) {
+            return true;
+        }
+
+        return false;
     }
 
     /* UpdateTaskDefs() {
@@ -119,10 +148,10 @@ export class SystemWorker<T> {
         setInterval(async () => {
             try {
                 if (this.model.pstate === ProcTaskState.COMPLETED || this.model.pstate === ProcTaskState.STOPPED) {
-                    await this.SaveData();
-                    if(this.intervalUpdateUi){
+                    if (this.intervalUpdateUi) {
                         clearInterval(this.intervalUpdateUi);
                     }
+                    await this.SaveData(true);
                     Logger.warn(`Process ${process.pid} ${this.model.pstate === ProcTaskState.COMPLETED ? 'COMPLETED' : 'STOPPED'}`);
                     if (this.model.pstate === ProcTaskState.STOPPED) {
                         UIFunctionsBinding.Instance.OnTaskEvent(TaskEvent.TASK_STOP, this.model.pname);
@@ -133,10 +162,10 @@ export class SystemWorker<T> {
                 }
 
                 if (this.model.pstate === ProcTaskState.COMPLETED_DELETE) {
-                    await this.SaveData();
-                    if(this.intervalUpdateUi){
+                    if (this.intervalUpdateUi) {
                         clearInterval(this.intervalUpdateUi);
                     }
+                    await this.SaveData(true);
                     await EntityTask.Instance.Delete(this.model.pname);
                     Logger.warn(`Process ${process.pid} Completed delete task`);
                     process.exit(1);

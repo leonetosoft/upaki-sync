@@ -11,6 +11,7 @@ import { UploadState } from '../sync/task/UploaderTask';
 import { SystemWorker } from "./SystemWorker";
 import { FunctionsBinding } from "../ipc/FunctionsBinding";
 import { WorkProcess } from "../api/thread";
+import { Util } from "../util/Util";
 
 export class WorkerProcessFile extends SystemWorker<any> {
     private static _instance: WorkerProcessFile;
@@ -62,9 +63,19 @@ export class WorkerProcessFile extends SystemWorker<any> {
             case FileTypeAction.ADD:
                 if (data.item === 'file') {
                     Logger.debug(`New file add ${data.key}`);
-                    QueueFile.Instance.addJob(new FileTask(new File(data.key, data.rootFolder), FileTypeAction.ADD));
+                    
+                    if (!fs.existsSync(data.key)) {
+                        Logger.warn(`File ${data.key} removed, process canceled`);
+                        return;
+                    }
+                    try {
+                        fs.accessSync(data.key, fs.constants.R_OK);
+                        QueueFile.Instance.addJob(new FileTask(new File(data.key, data.rootFolder), FileTypeAction.ADD));
+                    } catch (error) {
+                        Logger.warn(`File ${data.key} no read permissions!`);
+                    }
                 } else {
-                    Logger.warn(`Ignored folder creation ${data.key}`);
+                    Logger.debug(`Ignored folder creation ${data.key}`);
                 }
                 break;
 
@@ -75,13 +86,26 @@ export class WorkerProcessFile extends SystemWorker<any> {
                         let fileData = await EntityUpload.Instance.getFile(data.oldKey);
 
                         if (fileData && fileData.state === UploadState.FINISH) {
-                            Logger.warn(`File renamed checksum OK, not upload!`);
+                            Logger.debug(`File renamed checksum OK, not upload!`);
                         } else {
                             // this.RequestStopUpload(data.oldKey);
-                            FunctionsBinding.Instance.StopUpload(data.oldKey);
-                            let job = new FileTask(new File(data.key, data.rootFolder), FileTypeAction.ADD);
-                            job.priority = PRIORITY_QUEUE.HIGH;
-                            QueueFile.Instance.addJob(job);
+                            if (!fs.existsSync(data.key)) {
+                                Logger.warn(`File ${data.key} removed, process canceled`);
+                                return;
+                            }
+
+                            try {
+                                fs.accessSync(data.key, fs.constants.R_OK);
+
+                                FunctionsBinding.Instance.StopUpload(data.oldKey);
+                                let job = new FileTask(new File(data.key, data.rootFolder), FileTypeAction.ADD);
+                                job.priority = PRIORITY_QUEUE.HIGH;
+                                QueueFile.Instance.addJob(job);
+                            } catch (error) {
+                                Logger.warn(`File ${data.key} no read permissions!`);
+                            }
+
+
                         }
                     }
                 } catch (error) {
@@ -94,18 +118,39 @@ export class WorkerProcessFile extends SystemWorker<any> {
             case FileTypeAction.UNLINK:
                 if (data.item === 'file') {
                     Logger.debug(`Remove file ${data.key}`);
-                    let job = new FileTask(new File(data.key, data.rootFolder), FileTypeAction.UNLINK);
-                    job.priority = PRIORITY_QUEUE.HIGH;
-                    QueueFile.Instance.addJob(job);
+
+                    if (!fs.existsSync(data.key)) {
+                        Logger.warn(`File ${data.key} removed, process canceled`);
+                        return;
+                    }
+                    try {
+                        fs.accessSync(data.key, fs.constants.R_OK);
+                        let job = new FileTask(new File(data.key, data.rootFolder), FileTypeAction.UNLINK);
+                        job.priority = PRIORITY_QUEUE.HIGH;
+                        QueueFile.Instance.addJob(job);
+                    } catch (error) {
+                        Logger.warn(`File ${data.key} no read permissions!`);
+                    }
                 }
                 break;
 
             case FileTypeAction.CHANGE:
                 if (data.item === 'file') {
                     Logger.debug(`New file changed ${data.key}`);
-                    let job = new FileTask(new File(data.key, data.rootFolder), FileTypeAction.CHANGE);
-                    job.priority = PRIORITY_QUEUE.HIGH;
-                    QueueFile.Instance.addJob(job);
+
+                    if (!fs.existsSync(data.key)) {
+                        Logger.warn(`File ${data.key} removed, process canceled`);
+                        return;
+                    }
+
+                    try {
+                        fs.accessSync(data.key, fs.constants.R_OK);
+                        let job = new FileTask(new File(data.key, data.rootFolder), FileTypeAction.CHANGE);
+                        job.priority = PRIORITY_QUEUE.HIGH;
+                        QueueFile.Instance.addJob(job);
+                    } catch (error) {
+                        Logger.warn(`File ${data.key} no read permissions!`);
+                    }
                 }
                 break;
         }

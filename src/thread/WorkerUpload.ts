@@ -20,8 +20,9 @@ export class WorkerUpload extends SystemWorker<any> {
         return this._instance || (this._instance = new this());
     }
 
-    Init() {
+    async Init() {
         // process.on('message', this.Listen.bind(this));
+        await QueueUploader.Instance.initTasks();
         QueueUploader.Instance.tasks.Start();
         this.UpdateUiHandler();
     }
@@ -33,7 +34,7 @@ export class WorkerUpload extends SystemWorker<any> {
     }
 
     UpdateUiList() {
-        if (QueueUploader.Instance.tasks.getTaskListByPriority().length !== 0) {
+        if (QueueUploader.Instance.tasks && QueueUploader.Instance.tasks.getTaskListByPriority().length !== 0) {
             WorkerUpload.Instance.sendUploadList();
         }
     }

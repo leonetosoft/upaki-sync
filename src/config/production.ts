@@ -3,6 +3,7 @@ import { Config } from "./env";
 export var production: Config = {
     version: '1.0.0',
     useCluster: true,
+    ignoreLoggerParams: false,
     synchPath: "C:\\Users\\Leonardo\\Upaki"/*"E:\\"*/,
     credentialsPath: "C:\\Users\\Leonardo\\XdqL09gy83.apikey.json",
     logging: {
@@ -12,6 +13,7 @@ export var production: Config = {
         dbug: true,
         error: true
     },
+    userProfile: undefined,
     credentials: {
         secretToken: "",
         credentialKey: ""
@@ -39,6 +41,11 @@ export var production: Config = {
             taskSize: 1,
             maxRetries: 10,
             retryDelay: 30000
+        },
+        database: {
+            taskSize: 1,
+            maxRetries: 10,
+            retryDelay: 500
         }
     },
     socket: {

@@ -47,6 +47,7 @@ export class EntityCredentials {
 
     async RestoreCredentialsFromDb() {
         let credentials = await this.getCredentials();
+        console.log('credentials:: ', credentials);
         Environment.config.credentials = {
             deviceId: credentials.device_id,
             credentialKey: credentials.credential_key,

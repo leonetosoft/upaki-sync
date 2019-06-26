@@ -40,10 +40,10 @@ export * from './persist/entities/EntityFolderSync';
 export * from './persist/entities/EntityUpload';
 export * from './persist/entities/EntityTask';
 export * from './persist/entities/EntityCredentials';
+export * from './persist/entities/EntityParameter';
 
 import { Environment, Config } from './config/env';
 import * as cluster from 'cluster';
-import { PrintCredits } from './credits';
 import { WorkerMaster/*, testBing */ } from './thread/WorkerMaster';
 import { WorkerProcessFile } from './thread/WorkerProcessFile';
 import { WorkerUpload } from './thread/WorkerUpload';
@@ -56,12 +56,19 @@ import { WorkProcess, ProcessType } from './api/thread';
 import { Database } from './persist/Database';
 import { WorkerFileReceiver } from './thread/WorkerFileReceiver';
 import { WorkerCopyDir } from './thread/WorkerCopyDir';
-
+import { EntityParameter } from './persist/entities/EntityParameter';
+import { Util } from './util/Util';
+import { WorkerBackup } from './thread/WorkerBackup';
 export function BootSync(config: Config, onInit?: (err?) => void) {
     // Environment.config = config;
+    Util.getUserProfile().then((rs) => {
+        Logger.info('User profile OK');
+    }).catch(err => {
+        Logger.error(err);
+    });
 
     if (cluster.isMaster) {
-        PrintCredits();
+        // PrintCredits();
         Environment.config.worker = WorkProcess.MASTER;
         //Database.Instance.setMaster();
         if (Environment.config.credentials && Environment.config.credentials.credentialKey && Environment.config.credentials.secretToken) {
@@ -81,9 +88,30 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
         // TestDownloadTask();
         // WorkerMaster.Instance.RegisterUI(new testBing());
     } else if (cluster.isWorker) {
+
+        EntityParameter.Instance.GetParams(['LOGGER_TYPE',
+            'LOGGER_WARN',
+            'LOGGER_INFO',
+            'LOGGER_DBUG',
+            'LOGGER_ERROR'
+        ]).then(params => {
+            console.log('Logger params loadded');
+            if (Environment.config.ignoreLoggerParams) {
+                console.log('Params ignored ignoreLoggerParams = true');
+                return;
+            }
+            Environment.config.logging.type = params['LOGGER_TYPE'].split(',');
+            Environment.config.logging.warn = params['LOGGER_WARN'] === '1';
+            Environment.config.logging.info = params['LOGGER_INFO'] === '1';
+            Environment.config.logging.dbug = params['LOGGER_DBUG'] === '1';
+            Environment.config.logging.error = params['LOGGER_ERROR'] === '1';
+        }).catch(err => {
+            console.log('fail to load logger params:::');
+            console.log(err);
+        });
+
         if (process.env['PNAME'] && process.env['PTYPE']) {
             let type = Number(process.env['PTYPE']) as ProcessType;
-
             switch (type) {
                 case ProcessType.DOWNLOAD:
                     //Database.Instance.setMaster();
@@ -96,6 +124,10 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
 
                 case ProcessType.FILE_COPY:
                     WorkerCopyDir.Instance.Init();
+                    break;
+
+                case ProcessType.BACKUP:
+                    WorkerBackup.Instance.Init();
                     break;
             }
         } else {

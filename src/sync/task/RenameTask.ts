@@ -80,7 +80,7 @@ export class RenameTask extends Task {
                 if (folderSearch) {
                     this.ChangeNameUpaki(folderSearch.id, 'folder', folderSearch.key);
                 } else {
-                    Logger.warn(`[FOLDER] Item ${this.oldKey} not uploaded, rename descarted!`);
+                    Logger.info(`[FOLDER] Item ${this.oldKey} not uploaded, rename descarted!`);
                     this.job.Finish();
                 }
             } else {
@@ -89,7 +89,7 @@ export class RenameTask extends Task {
                 if (fileData) {
                     this.ChangeNameUpaki(fileData.file_id, 'file', fileData.path);
                 } else {
-                    Logger.warn(`[FILE] Item ${this.oldKey} not uploaded, rename descarted!`);
+                    Logger.info(`[FILE] Item ${this.oldKey} not uploaded, rename descarted!`);
                     this.job.Finish();
                 }
             }

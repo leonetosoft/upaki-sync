@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import { BootSync, Database } from './index';
 import { EntityCredentials } from './persist/entities/EntityCredentials';
 import * as cluster from 'cluster';
+import { Logger } from './util/Logger';
 
 
 /*let arg = 0;
@@ -46,6 +47,7 @@ EntityCredentials.Instance.RestoreCredentialsFromDb().then(rs => {
         }
     });
 }).catch(err => {
+    console.log(err);
     console.log('erro na inicializacao');
 })
 

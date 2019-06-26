@@ -87,7 +87,11 @@ export class WorkerScanProcess extends SystemWorker<any> {
                     return;
                 }
                 
-                await this.ScanDir(folder);
+                try {
+                    await this.ScanDir(folder);
+                } catch (scanErr) {
+                    Logger.error(scanErr);
+                }
             }
         });
     }

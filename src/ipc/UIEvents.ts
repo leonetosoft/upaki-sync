@@ -7,4 +7,6 @@ export interface UIEvents {
     FinishScan(src: string);
     UpdateTaskDefinition(task: TaskModel<any>, cacheSource: string);
     OnTaskEvent(eventType: TaskEvent, pname: string);
+    UpakiAlreadyOpen();
+    UpakiRequestMaximize();
 }

@@ -1,4 +1,4 @@
-import * as Raven from 'raven';
+/*import * as Raven from 'raven';
 import { Environment } from '../config/env';
 import * as os from 'os';
 import { QueueUploader } from '../sync/queue/QueueUploader';
@@ -61,4 +61,4 @@ export class Sentry {
 
 
 
-export var SentryLog = Raven;
+export var SentryLog = Raven;*/

@@ -4,8 +4,9 @@ import * as fs from 'fs';
 import * as util from 'util';
 import * as path from 'path';
 import * as moment from 'moment';
-import { Sentry } from './Sentry';
+//import { Sentry } from './Sentry';
 import { Util } from './Util';
+import { SentryManager } from './SentryManager';
 
 export namespace Logger {
     // export declare var LogInfoWriter, LogErrorWriter, LogDebugWriter, LogWarnWritter;
@@ -42,7 +43,15 @@ export namespace Logger {
         }
     }
 
-    export function error(error: Error | string) {
+    export function assert(info) {
+        try {
+            this.WriteFile(info, 'assert');
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    export function error(error: Error | string | any) {
         try {
             if (Environment.config.logging.error) {
                 if (Environment.config.logging.type.find(el => el === 'file')) {
@@ -53,8 +62,9 @@ export namespace Logger {
                     console.log(error);
                     console.log(chalk.default.red('=======  -----  ======='));
                 }
-
-                // Sentry.Instance.reportError(error);
+                if (Environment.config.logging.type.find(el => el === 'sentry')) {
+                    SentryManager.Instance.reportError(error);
+                }
             }
         } catch (error) {
 

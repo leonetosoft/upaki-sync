@@ -25,6 +25,26 @@ export class UIFunctionsBinding {
         mainWorter: WorkProcess.MASTER,
         response: false
     })
+    UpakiAlreadyOpen() {
+        WorkerMaster.Instance.implUi.forEach((el) => {
+            el.UpakiAlreadyOpen();
+        });
+    }
+
+    @SharedFuncion({
+        mainWorter: WorkProcess.MASTER,
+        response: false
+    })
+    UpakiRequestMaximize() {
+        WorkerMaster.Instance.implUi.forEach((el) => {
+            el.UpakiRequestMaximize();
+        });
+    }
+
+    @SharedFuncion({
+        mainWorter: WorkProcess.MASTER,
+        response: false
+    })
     PathScan(src: string, actualScan: string) {
         WorkerMaster.Instance.implUi.forEach((el) => {
             el.PathScan(src, actualScan);

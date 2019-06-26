@@ -79,6 +79,34 @@ export class EntityTask {
         });
     }
 
+    UpdateDataLight<T>(task: TaskModel<T>) {
+        return new Promise<number>((resolve, reject) => {
+            Util.WriteTaskData(task.pname, task.pdata, (errTaskData, source) => {
+                if (errTaskData) {
+                    reject(errTaskData);
+                } else {
+                    /*Database.Instance.Run(`UPDATE task SET pdata=?, pstate=?, ptype=?, pdesc=?, autostart=? WHERE pname = ? and user_id=?`, [source, task.pstate, task.ptype, task.pdesc, task.pname, Environment.config.credentials.userId], (errInsert) => {
+                        if (errInsert) {
+                            reject(errInsert);
+                            return;
+                        }
+                        resolve(1);
+                    });*/
+                    UIFunctionsBinding.Instance.UpdateTaskDefinition({
+                        pname: task.pname,
+                        pstate: task.pstate,
+                        pdesc: task.pdesc,
+                        ptype: task.ptype,
+                        pdata: undefined,
+                        autostart: task.autostart
+                    }, source);
+
+                    resolve();
+                }
+            });
+        });
+    }
+
     ListTasksOfType<T>(ptype: ProcessType): Promise<TaskModel<T>[]> {
         return new Promise((resolve, reject) => {
             Database.Instance.All(`SELECT pname, pdata, pstate, ptype, pdesc, autostart FROM task WHERE ptype=? and user_id=?`, [ptype, Environment.config.credentials.userId], (err, rows: TaskModel<any>[]) => {
@@ -156,7 +184,16 @@ export class EntityTask {
 
                 Util.ReadTaskData<T>(`${row.pname}`, (errReadTask, data, cacheSource) => {
                     if (errReadTask) {
-                        reject(errReadTask);
+                        /*reject(errReadTask);*/
+                        Logger.error(errReadTask);
+                        resolve({
+                            pdata: undefined,
+                            pname: row.pname,
+                            pstate: row.pstate,
+                            pdesc: row.pdesc,
+                            ptype: row.ptype,
+                            autostart: row.autostart
+                        });
                     } else {
                         resolve({
                             pdata: data,

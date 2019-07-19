@@ -76,6 +76,7 @@ export class EntityParameter {
                 (err, rows) => {
                     if (err) {
                         reject(err);
+                        return;
                     }
                     let ret = {};
                     for (let KEY of requestParams) {

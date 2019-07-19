@@ -72,6 +72,57 @@ export class FunctionsBinding {
     }
 
     @SharedFuncion({
+        mainWorter: WorkProcess.WORKER_UPLOAD,
+        response: false
+    })
+    ProcessFileLoteV2(rootFolder: string/*, callback: (err, rs) => void*/) {
+        try {
+            let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
+            if (!fs.existsSync(source)) {
+                Logger.warn(`File ${source} not exists in loc !!! realtime sinc not upload ...`);
+                return;
+            }
+            var instream = fs.createReadStream(source);
+            var rl = readline.createInterface(instream);
+
+            rl.on('line', (line) => {
+                // console.log(line);
+                if (line && line !== '') {
+                    //WorkerProcessFile.Instance.PutFileQueue(line, rootFolder);
+
+                    try {
+                        let filePaths = line.split(';');
+
+                        let sessionData = filePaths[1] != 'null' ? JSON.parse(new Buffer(filePaths[1], 'base64').toString('utf8')) : {
+                            Parts: [],
+                            DataTransfered: 0
+                        };
+    
+                        FunctionsBinding.Instance.UploadFile(filePaths[0], sessionData, rootFolder, (err, rs) => {
+                            if(err) {
+                                Logger.error(err);
+                            }
+                        }); 
+                    } catch (error) {
+                        Logger.error(error);
+                    }
+                    
+                }
+            });
+
+            rl.on('close', () => {
+                try {
+                    fs.unlinkSync(source);
+                } catch (error) {
+                    Logger.error(error);
+                }
+            });
+        } catch (error) {
+            Logger.error(error);
+        }
+    }
+
+    @SharedFuncion({
         mainWorter: WorkProcess.WORKER_PROCESS_FILE,
         response: false
     })

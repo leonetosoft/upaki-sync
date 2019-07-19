@@ -208,9 +208,14 @@ export class UploaderTask extends Task {
 
             this.state = UploadState.UPLOADING;
         } catch (error) {
-            Logger.error(error);
-            this.state = UploadState.ERROR;
-            this.job.Fail(Environment.config.queue.uploader.retryDelay);
+            if(error && error.code === 'EIO') {
+                Logger.error(`File corrupted, Fail EIO file ${this.file.filePath} error code EIO`);
+                this.job.Finish();
+            } else {
+                Logger.error(error);
+                this.state = UploadState.ERROR;
+                this.job.Fail(Environment.config.queue.uploader.retryDelay);
+            }
         }
     }
 
@@ -478,8 +483,14 @@ export class UploaderTask extends Task {
 
             this.state = UploadState.UPLOADING;
         } catch (error) {
-            Logger.error(error);
-            this.job.Fail(Environment.config.queue.uploader.retryDelay);
+            if(error && error.code === 'EIO') {
+                Logger.error(`File corrupted, Fail EIO file ${this.file.filePath} error code EIO`);
+               // Logger.error(error);
+                this.job.Finish();
+            } else {
+                Logger.error(error);
+                this.job.Fail(Environment.config.queue.uploader.retryDelay);
+            }
         }
     }
 

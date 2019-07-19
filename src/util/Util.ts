@@ -8,6 +8,7 @@ import { UploaderTask } from '../sync/task/UploaderTask';
 import { Environment } from '../config/env';
 import { Upaki, UpakiArchiveList, UpakiUserProfile } from 'upaki-cli';
 import { Logger } from './Logger';
+import * as http from 'http';
 
 export namespace Util {
     /**
@@ -111,6 +112,41 @@ export namespace Util {
         return '0.0.0.0';
     }
 
+    export function AlreadyStarted(): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+          try {
+            var options = {
+              "method": "POST",
+              "hostname": '127.0.0.1',
+              "port": 33333,
+              "path": "/",
+              "headers": {
+                "cache-control": "no-cache"
+              }
+            };
+      
+            var req = http.request(options, (res) => {
+              setTimeout(() => {
+                //electron.app.exit(0);
+                resolve(true);
+              }, 1000);
+            });
+      
+            req.on("error", (err: any) => {
+              if (err.code === 'ECONNREFUSED') {
+                resolve(false);
+              }
+            });
+      
+            req.write('REQUEST_MAXIMIZE');
+            req.end();
+          } catch (error) {
+            console.log(error);
+            resolve(false);
+          }
+        });
+      }
+
     export function Etagv2(filename, algorithm = 'md5') {
         return new Promise((resolve, reject) => {
             // Algorithm depends on availability of OpenSSL on platform
@@ -126,6 +162,12 @@ export namespace Util {
                     const hash = shasum.digest('hex')
                     return resolve(hash);
                 })
+
+                s.on('error', function(err){ 
+                    console.log('deu um error');
+                    console.log(err.code);     
+                    reject();           
+                });
             } catch (error) {
                 Logger.error(error);
                 return resolve('');

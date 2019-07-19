@@ -11,7 +11,7 @@ import { UploadState } from '../sync/task/UploaderTask';
 import { SystemWorker } from "./SystemWorker";
 import { FunctionsBinding } from "../ipc/FunctionsBinding";
 import { WorkProcess } from "../api/thread";
-import { Util } from "../util/Util";
+//import { Util } from "../util/Util";
 
 export class WorkerProcessFile extends SystemWorker<any> {
     private static _instance: WorkerProcessFile;

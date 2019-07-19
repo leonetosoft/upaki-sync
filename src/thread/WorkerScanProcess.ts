@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { WorkProcess } from '../api/thread';
+import { EntityUploadData } from '../api/entity';
 
 export interface ScanTasks {
     path: string;
@@ -77,16 +78,16 @@ export class WorkerScanProcess extends SystemWorker<any> {
                 return;
             }
             for (let folder of folders) {
-                if(!fs.existsSync(folder)){
+                if (!fs.existsSync(folder)) {
                     EntityFolderSync.Instance.DeleteFolder(folder, (err) => {
-                        if(err)
-                        Logger.error(err);
+                        if (err)
+                            Logger.error(err);
 
                         Logger.warn(`Folder realtime sinch removed, folder not exists ${folder}`);
                     });
                     return;
                 }
-                
+
                 try {
                     await this.ScanDir(folder);
                 } catch (scanErr) {
@@ -149,6 +150,19 @@ export class WorkerScanProcess extends SystemWorker<any> {
         let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
         if (fs.existsSync(source)) {
             fs.unlinkSync(source)
+        }
+    }
+
+    private prepareDataInfo(dta: EntityUploadData) {
+        if (dta.sessionData) {
+            try {
+                return new Buffer(JSON.stringify(dta.sessionData)).toString('base64');
+            } catch (error) {
+                Logger.error(error);
+                return 'null';
+            }
+        } else {
+            return 'null';
         }
     }
 
@@ -215,11 +229,11 @@ export class WorkerScanProcess extends SystemWorker<any> {
                         arquivos += notInList.length + sendFilesOnList.length;
 
                         for (let append of notInList) {
-                            fileAppend += `${append.filePath}\n`;
+                            fileAppend += `${append.filePath};null\n`;
                         }
 
                         for (let append of sendFilesOnList) {
-                            fileAppend += `${append.path}\n`;
+                            fileAppend += `${append.path};${this.prepareDataInfo(append)}\n`;
                         }
 
                         this.AppendFastFile(fileAppend, src, (err) => {
@@ -302,7 +316,7 @@ export class WorkerScanProcess extends SystemWorker<any> {
                     Logger.info(`Complete Scan Directory ${src}`);
                     clearInterval(sendUi);
                     UIFunctionsBinding.Instance.FinishScan(src);
-                    FunctionsBinding.Instance.ProcessFileLote(src);
+                    FunctionsBinding.Instance.ProcessFileLoteV2(src);
                     // MessageToWorker(WorkProcess.MASTER, { type: 'SCAN_DIR_NOTIFY', data: { folder: 'src', directory: '' } });
                     this.RemoveTask(src);
                     resolve();

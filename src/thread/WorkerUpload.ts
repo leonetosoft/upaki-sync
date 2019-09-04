@@ -8,6 +8,8 @@ import { S3StreamSessionDetails } from "upaki-cli";
 import { FunctionsBinding } from "../ipc/FunctionsBinding";
 import { UIFunctionsBinding } from "../ipc/UIFunctionsBinding";
 import { WorkProcess } from "../api/thread";
+import { EntityParameter } from "../persist/entities/EntityParameter";
+import { Upaki } from 'upaki-cli';
 
 export class WorkerUpload extends SystemWorker<any> {
     private static _instance: WorkerUpload;
@@ -22,6 +24,23 @@ export class WorkerUpload extends SystemWorker<any> {
 
     async Init() {
         // process.on('message', this.Listen.bind(this));
+        const proxyParams = await EntityParameter.Instance.GetParams(['PROXY_SERVER',
+            'PROXY_PORT',
+            'PROXY_PROTOCOL',
+            'PROXY_USER',
+            'PROXY_PASS',
+            'PROXY_ENABLE']);
+
+        if (Number(proxyParams['PROXY_ENABLE'])) {
+            Logger.debug(`Proxy agent: ${JSON.stringify(proxyParams)}`);
+            Upaki.UpdateProxyAgent({
+                PROXY_SERVER: proxyParams['PROXY_SERVER'],
+                PROXY_PORT: proxyParams['PROXY_PORT'],
+                PROXY_PROTOCOL: proxyParams['PROXY_PROTOCOL'],
+                PROXY_USER: proxyParams['PROXY_USER'],
+                PROXY_PASS: proxyParams['PROXY_PASS']
+            });
+        }
         await QueueUploader.Instance.initTasks();
         QueueUploader.Instance.tasks.Start();
         this.UpdateUiHandler();
@@ -34,7 +53,7 @@ export class WorkerUpload extends SystemWorker<any> {
     }
 
     UpdateUiList() {
-        if (QueueUploader.Instance.tasks && QueueUploader.Instance.tasks.getTaskListByPriority().length !== 0) {
+        if (QueueUploader.Instance.tasks /*&& QueueUploader.Instance.tasks.getTaskListByPriority().length !== 0*/) {
             WorkerUpload.Instance.sendUploadList();
         }
     }
@@ -71,7 +90,17 @@ export class WorkerUpload extends SystemWorker<any> {
     }
 
     public StopUploadsOfPath(path) {
-        QueueUploader.Instance.tasks.getTaskListByPriority().forEach(job => {
+        const byFilePath = QueueUploader.Instance.tasks.byIndex('filePath', path);
+
+        if (byFilePath) {
+            try {
+                Logger.debug(`Request cancel taskId=${byFilePath.task.id}`);
+                byFilePath.task.Cancel();
+            } catch (error) {
+                Logger.error(error);
+            }
+        }
+        /*QueueUploader.Instance.tasks.getTaskListByPriority().forEach(job => {
             try {
                 if (job.task.file.getPath() === path) {
                     Logger.debug(`Request cancel taskId=${job.task.id}`);
@@ -80,7 +109,7 @@ export class WorkerUpload extends SystemWorker<any> {
             } catch (error) {
                 Logger.error(error);
             }
-        });
+        });*/
     }
 
     /*AddUpload(upload: UploaderTask) {
@@ -101,46 +130,48 @@ export class WorkerUpload extends SystemWorker<any> {
 
     sendUploadList() {
         try {
-            let taskByPriority = QueueUploader.Instance.tasks.getTaskListByPriority();
+            let taskByPriority = /*QueueUploader.Instance.tasks.getTaskListByPriority()*/QueueUploader.Instance.tasks.trends(5);
 
-            let totalSend = taskByPriority.reduce<number>((i, el) => {
-                    return i + (el.task.file.getSize(true) - el.task.loaded);
-            }, 0);
+            let totalSend = QueueUploader.Instance.totalUploadBytes/*taskByPriority.reduce<number>((i, el) => { //contar!!!
+                return i + (el.task.file.getSize(true) - el.task.loaded);
+            }, 0)*/;
 
-            let numberOfUploads = taskByPriority.length;
+            let numberOfUploads = QueueUploader.Instance.tasks.getTotalQueue(); // numero de uploads !!!!!!
 
+            /*
+            ordenacao
             taskByPriority = taskByPriority.sort((a, b) => {
                 if (a.task.state === UploadState.UPLOADING) {
                     return -1;
                 } else {
                     return 1;
                 }
-            });
+            });*/
 
-            let listUpload = taskByPriority.slice(0, 5).map(task => {
+            let listUpload = taskByPriority.map(task => {
                 let upload = task.task;
 
-               // if (upload.file.Exists()) {
-                    return {
-                        path: upload.file.getPath(),
-                        cloudpath: upload.file.getKey(),
-                        state: upload.state,
-                        parts: upload.session.Parts,
-                        loaded: upload.loaded,
-                        uploadType: upload.uploadType,
-                        size: upload.file.getSize(true),
-                        name: upload.file.getFullName(),
-                        key: upload.file.getKey(),
-                        preventTimeLeft: upload.preventTimeLeft,
-                        speedBps: upload.speedBps,
-                        speed: upload.speed,
-                        speedType: upload.speedType
-                    }
-               /* } else {
-                    Logger.warn(`Task upload file ${task.id}, file not exists!!! removed from queue ${upload.file.filePath}`);
-                    task.Finish();
-                    return undefined;
-                }*/
+                // if (upload.file.Exists()) {
+                return {
+                    path: upload.file.getPath(),
+                    cloudpath: upload.file.getKey(),
+                    state: upload.state,
+                    parts: upload.session.Parts,
+                    loaded: upload.loaded,
+                    uploadType: upload.uploadType,
+                    size: upload.file.getSize(true),
+                    name: upload.file.getFullName(),
+                    key: upload.file.getKey(),
+                    preventTimeLeft: upload.preventTimeLeft,
+                    speedBps: upload.speedBps,
+                    speed: upload.speed,
+                    speedType: upload.speedType
+                }
+                /* } else {
+                     Logger.warn(`Task upload file ${task.id}, file not exists!!! removed from queue ${upload.file.filePath}`);
+                     task.Finish();
+                     return undefined;
+                 }*/
             })/*.filter(el => el !== undefined)*/;
 
             /*MessageToWorker(WorkProcess.WORKER_SOCKET, {

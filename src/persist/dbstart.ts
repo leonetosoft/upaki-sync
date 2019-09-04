@@ -14,6 +14,8 @@ export function dbMaintance() {
     return [`ALTER TABLE task ADD COLUMN autostart INTEGER DEFAULT 0 NOT NULL`,
         `ALTER TABLE sync_folder ADD delete_file INTEGER DEFAULT 0 NOT NULL`,
         `ALTER TABLE sync_folder ADD delete_on_finish INTEGER DEFAULT 0 NOT NULL`,
+        `ALTER TABLE sync_folder ADD scan_delay INTEGER DEFAULT 0 NOT NULL`,
+        `ALTER TABLE sync_folder ADD realtime INTEGER DEFAULT 1 NOT NULL`,
         `UPDATE parameter SET VALUE='file,sentry' WHERE KEY='LOGGER_TYPE' AND VALUE='file'`];
 }
 
@@ -30,6 +32,12 @@ export function getDefaultParameters() {
         LOGGER_WARN: 1,
         LOGGER_INFO: 0,
         LOGGER_DBUG: 0,
-        LOGGER_ERROR: 1
+        LOGGER_ERROR: 1,
+        PROXY_SERVER: '',
+        PROXY_PORT: 0,
+        PROXY_PROTOCOL: 'http',
+        PROXY_USER: '',
+        PROXY_PASS: '',
+        PROXY_ENABLE: 0
     };
 }

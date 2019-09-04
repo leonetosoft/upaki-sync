@@ -36,7 +36,8 @@ export class QueueFile {
         }, {
                 taskSize: Environment.config.queue.fileAction.taskSize,
                 maxRetries: Environment.config.queue.fileAction.maxRetries,
-                retryDelay: Environment.config.queue.fileAction.retryDelay
+                retryDelay: Environment.config.queue.fileAction.retryDelay,
+                indexes: ['filePath']
             });
 
         Logger.info(`[FileRename] - Queue initialized taskSize[${Environment.config.queue.fileAction.taskSize}] maxRetries[${Environment.config.queue.fileAction.maxRetries}] retryDelay[${Environment.config.queue.fileAction.retryDelay}]`)
@@ -71,6 +72,6 @@ export class QueueFile {
     }
 
     addJob(job: FileTask) {
-        this.tasks.AddJob(job);
+        this.tasks.Enqueue(job);
     }
 }

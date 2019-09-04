@@ -121,6 +121,7 @@ export namespace Util {
               "port": 33333,
               "path": "/",
               "headers": {
+                "content-type": "application/json",
                 "cache-control": "no-cache"
               }
             };
@@ -138,7 +139,7 @@ export namespace Util {
               }
             });
       
-            req.write('REQUEST_MAXIMIZE');
+            req.write(JSON.stringify({action: "REQUEST_MAXIMIZE"}));
             req.end();
           } catch (error) {
             console.log(error);

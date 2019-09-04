@@ -18,10 +18,12 @@ export enum FileTypeAction {
 
 export class FileTask extends Task {
     file: File;
+    filePath: string;
     action: FileTypeAction;
     constructor(file: File, action: FileTypeAction) {
         super();
         this.file = file;
+        this.filePath = file.filePath;
         this.action = action;
     }
 
@@ -39,7 +41,7 @@ export class FileTask extends Task {
      * @private
      * @memberof FileTask
      */
-    private StopFileAnalizes() {
+    /*private StopFileAnalizes() {
         QueueFile.Instance.tasks.getTaskListByPriority().forEach(job => {
             try {
                 if (job.task.id !== this.id) {
@@ -49,7 +51,7 @@ export class FileTask extends Task {
                 Logger.error(error);
             }
         });
-    }
+    }*/
 
     /*private ProcessPriority(task: UploaderTask) {
         if (task.loaded > 0) {

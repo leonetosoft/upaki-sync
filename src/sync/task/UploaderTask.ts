@@ -37,6 +37,7 @@ export class UploaderTask extends Task {
     // filePath: string;
     // rootFolder: string;
     file: File;
+    filePath: string;
     state: UploadState = UploadState.AWAIT;
     loaded: number;
     uploadType: UploadType = UploadType.SIMPLE;
@@ -73,6 +74,7 @@ export class UploaderTask extends Task {
     }) {
         super();
         this.file = file;
+        this.filePath = file.filePath;
         this.session = session;
         this.loaded = session.DataTransfered;
         this.upaki = new Upaki(Environment.config.credentials);
@@ -97,21 +99,34 @@ export class UploaderTask extends Task {
     }
 
     async OnUploadFinish() {
-        try {
-            if (await EntityFolderSync.Instance.DeleteOnSend(this.file.rootFolder)) {
-                fs.unlinkSync(this.file.filePath);
-                await EntityUpload.Instance.delete(this.file.filePath);
-                if (this.file.rootFolder !== Util.getPathNameFromFile(this.file.filePath)) {
-                    Util.cleanEmptyFoldersRecursively(Util.getPathNameFromFile(this.file.filePath));
+        let retryCount = 0;
+
+        let requestDeletion = async () => {
+            try {
+                if (await EntityFolderSync.Instance.DeleteOnSend(this.file.rootFolder)) {
+                    fs.unlinkSync(this.file.filePath);
+                    await EntityUpload.Instance.delete(this.file.filePath);
+                   // if (this.file.rootFolder !== Util.getPathNameFromFile(this.file.filePath)) {
+                       // Util.cleanEmptyFoldersRecursively(Util.getPathNameFromFile(this.file.filePath));
+                   // }
+                }
+            } catch (error) {
+                if (error.code && error.code === 'EBUSY' && retryCount < 4) {
+                    retryCount++;
+                    setTimeout(() => {
+                        requestDeletion();
+                    }, 2000);
+                } else {
+                    Logger.error(error);
                 }
             }
-        } catch (error) {
-            Logger.error(error);
-        }
+        };
+
+        requestDeletion();
     }
 
     Cancel() {
-        if(this.job.stat === STATUS.FINISHED){
+        if (this.job.stat === STATUS.FINISHED) {
             Logger.warn(`Request cancel uploading jog already finished ${this.file.getFullName()}`)
             return;
         }
@@ -125,7 +140,7 @@ export class UploaderTask extends Task {
 
         if (this.simpleUploadeEmitter || this.multipartUploadEmitter) {
 
-            
+
             let deadLockCancel = setTimeout(() => {
                 Logger.warn(`Stop upload of ${this.file.getFullName()} deadlock cencel detected, force closing!!!`);
                 this.job.Finish();
@@ -208,7 +223,7 @@ export class UploaderTask extends Task {
 
             this.state = UploadState.UPLOADING;
         } catch (error) {
-            if(error && error.code === 'EIO') {
+            if (error && error.code === 'EIO') {
                 Logger.error(`File corrupted, Fail EIO file ${this.file.filePath} error code EIO`);
                 this.job.Finish();
             } else {
@@ -265,7 +280,7 @@ export class UploaderTask extends Task {
 
     private save() {
         try {
-            EntityUpload.Instance.save({
+            EntityUpload.Instance.saveIpc({
                 key: this.file.getKey(),
                 path: this.file.getPath(),
                 lastModifies: this.file.getLastModifies(),
@@ -283,7 +298,7 @@ export class UploaderTask extends Task {
             });
 
             if (this.folder_id) {
-                EntityFolderMap.Instance.save({
+                EntityFolderMap.Instance.saveIpcFolder({
                     key: Util.getPathNameFromFile(this.file.getPath()),
                     id: this.folder_id
                 }, (err, data) => {
@@ -297,7 +312,7 @@ export class UploaderTask extends Task {
         } catch (error) {
             this.state = UploadState.ERROR;
             Logger.error(error);
-            this.job.Fail();
+            //this.job.Fail();
         }
     }
     private async MultiplePartUpload() {
@@ -367,7 +382,7 @@ export class UploaderTask extends Task {
                         return;
                     }
                     this.save();
-                }else {
+                } else {
                     Logger.error(`Unknow error in upload file ${this.file.getFullName()}`);
                     Logger.error(error);
                 }
@@ -483,9 +498,9 @@ export class UploaderTask extends Task {
 
             this.state = UploadState.UPLOADING;
         } catch (error) {
-            if(error && error.code === 'EIO') {
+            if (error && error.code === 'EIO') {
                 Logger.error(`File corrupted, Fail EIO file ${this.file.filePath} error code EIO`);
-               // Logger.error(error);
+                // Logger.error(error);
                 this.job.Finish();
             } else {
                 Logger.error(error);

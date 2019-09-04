@@ -49,7 +49,11 @@ export class WorkerWatcher extends SystemWorker<any> {
                 return;
             }
             for (let folder of folders) {
-                this.AddWatch(folder);
+                if(folder.realtime) {
+                    this.AddWatch(folder.folderPath);
+                } else {
+                    Logger.info(`Folder ${folder.folderPath} nor realtime events!`);
+                }
             }
         });
     }

@@ -283,23 +283,23 @@ export class WorkerMaster {
      */
     public async forkProcess<T>(newProcess: TaskModel<T>, initialize = false, callback: (err: Error, pnew: WorkerProcess) => void, forcesave = false) {
         try {
-            if (!newProcess.pname) {
-                newProcess.pname = uuidv1();
-                await EntityTask.Instance.UpdateData(newProcess);
-            }
-
-            if (forcesave) {
-                await EntityTask.Instance.UpdateData(newProcess);
-            }
-
             if (!newProcess.pdata) {
                 callback(new Error(`Não existe nenhum dado nesta tarefa`), undefined);
                 return;
             }
-
+            
             if (!newProcess.pdesc) {
                 callback(new Error(`Não existe uma descricao para esta tarefa`), undefined);
                 return;
+            }
+
+            if (!newProcess.pname) {
+                newProcess.pname = uuidv1();
+                await EntityTask.Instance.UpdateData(newProcess);
+            }
+            
+            if (forcesave) {
+                await EntityTask.Instance.UpdateData(newProcess);
             }
 
             let indexOfProcF = this.PROCESS_LIST.findIndex(el => el.pname === newProcess.pname);

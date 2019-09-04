@@ -36,8 +36,8 @@ export class RenameTask extends Task {
             if (!id) {
                 Logger.error(`No id from item [${type}] ${this.newKey}`);
 
-                let index = QueueFile.Instance.tasks.getTaskListByPriority().findIndex(job => job.task.file.getPath() == this.newKey);
-                if (index === -1) {
+                const byFilePath = QueueFile.Instance.tasks.byIndex('filePath', this.newKey);
+                if (!byFilePath) {
                     QueueFile.Instance.addJob(new FileTask(new File(this.newKey, this.rootFolder), FileTypeAction.ADD));
                 }
                 return;

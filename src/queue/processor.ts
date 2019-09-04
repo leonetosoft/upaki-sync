@@ -4,8 +4,15 @@ import { Job } from './job';
 
 import * as events from 'events';
 import { Logger } from '../util/Logger';
+import * as fs from 'fs';
 
 //var eventEmitter =
+export interface Indexe<T extends Task> {
+    [index: string]: Job<T>;
+}
+export interface ProcessorIndexes<T extends Task> {
+    [index: string]: Indexe<T>;
+}
 
 export class Processor<T extends Task> {
     private loopTime: number;
@@ -19,14 +26,24 @@ export class Processor<T extends Task> {
     private fn: any;
     private interval: NodeJS.Timer;
     public eventEmitter: events.EventEmitter;
-    private countProcessing = 0;
+    private indexes: ProcessorIndexes<T> = {};
 
-    constructor(fn, options) {
-        this.loopTime = options.loopTime || 500;
+    countProcessing: number = 0;
+
+    debug = false;
+
+    constructor(fn, options, debug = false) {
+        this.loopTime = options.loopTime || 1000;
         this.retryDelay = options.retryDelay || 1000;
         this.maxRetries = options.maxRetries || 1;
         this.taskSize = options.taskSize || 1;
+        options.indexes = options.indexes ? [options.indexes, ...['id']] : ['id'];
         //this.taskList = [];
+        if (options.indexes) {
+            for (let index of options.indexes) {
+                this.indexes[String(index)] = {};
+            }
+        }
 
         this.taskListHigh = [];
         this.taskListMedium = [];
@@ -48,26 +65,39 @@ export class Processor<T extends Task> {
                 clearInterval(this.interval);
             }
         });
+
+        this.debug = debug;
+        /*  if (debug) {
+              setInterval(() => {
+                 // this.DebugIndex();
+                 console.log(this.indexes['filePath']);
+              }, 1000);
+          }*/
     }
 
-    /*getTaskList(): Job<T>[] {
-        return this.taskList;
-    }*/
+    getTotalQueue() {
+        return this.taskListHigh.length + this.taskListMedium.length + this.taskListLow.length;
+    }
 
-    getTaskListByPriority(): Job<T>[] {
-        /*let taskHigh = this.taskList.filter(task =>
-            task.task.priority == PRIORITY_QUEUE.HIGH);
+    trends(max: number) {
+        let trends_1 = this.taskListHigh.slice(0, max);
+        if (trends_1.length === max) {
+            return trends_1;
+        }
 
-        let taskMedium = this.taskList.filter(task =>
-            task.task.priority == PRIORITY_QUEUE.MEDIUM);
+        let trends_2 = this.taskListMedium.slice(0, max - trends_1.length);
+        if ((trends_1.length + trends_2.length) === max) {
+            return [...trends_1, ...trends_2];
+        }
 
-        let taskLow = this.taskList.filter(task =>
-            task.task.priority == PRIORITY_QUEUE.LOW);*/
+        let trends_3 = this.taskListLow.slice(0, max - trends_1.length - trends_2.length);
+        return [...trends_1, ...trends_2, ...trends_3];
+    }
 
-        let selectedTasks: Job<T>[] = [];
-        selectedTasks = selectedTasks.concat(this.taskListHigh, this.taskListMedium, this.taskListLow);
-
-        return selectedTasks;
+    byIndex(index: string, value: string): Job<T> {
+        if (this.indexes[index]) {
+            return this.indexes[index][value];
+        }
     }
 
     NoTasksProcessing() {
@@ -75,7 +105,7 @@ export class Processor<T extends Task> {
     }
 
     getTaskById(id): Job<T> {
-        return this.getTaskListByPriority().find(t => t.id === id);
+        return this.indexes['id'][id];
     }
 
     LoopFunction() {
@@ -115,8 +145,38 @@ export class Processor<T extends Task> {
         clearInterval(this.interval);
     }
 
-    AddJob(task: Task) {
+    DebugIndex() {
+        var cache = [];
+        fs.writeFile(`testa.json`, JSON.stringify(this.indexes, function (key, value) {
+            if (typeof value === 'object' && value !== null) {
+                if (cache.indexOf(value) !== -1) {
+                    // Duplicate reference found, discard key
+                    return;
+                }
+                // Store value in our collection
+                cache.push(value);
+            }
+            return value;
+        }, 4), function (err) {
+            if (err) {
+                console.log(err);
+            } else {
+                console.log("JSON saved to " + 'testa.json');
+            }
+        });
+    }
+
+    Enqueue(task: Task) {
         let jb = new Job<T>(<T>task, this);
+
+        for (let index of Object.keys(this.indexes)) {
+            if (index !== 'id' && !jb.task[index]) {
+                console.log(`Index ${index} not exists in task`);
+                this.eventEmitter.emit('indexError', `Index ${index} not exists in task`);
+                continue;
+            }
+            this.indexes[index][String(index !== 'id' ? jb.task[index] : jb['id'])] = jb;
+        }
 
         switch (jb.task.priority) {
             case PRIORITY_QUEUE.HIGH:
@@ -135,23 +195,25 @@ export class Processor<T extends Task> {
     }
 
     CountProcessingJobs() {
-        let counter = 0;
-        this.getTaskListByPriority().forEach((job, index) => {
-            if (job.stat == STATUS.PROCESSING) {
-                counter++;
-            }
-        });
-        return counter;
+        return this.countProcessing;
     }
 
     RemoveFinishedJob(job: Job<T>) {
         let indexDel = -1;
+
+        for (let index of Object.keys(this.indexes)) {
+            if ((index !== 'id' && job.task[index]) || index === 'id') {
+                delete this.indexes[index][index !== 'id' ? job.task[index] : job['id']];
+            }
+        }
+
         switch (job.task.priority) {
             case PRIORITY_QUEUE.HIGH:
                 indexDel = this.taskListHigh.findIndex(jobFind => jobFind.id === job.id);
                 if (indexDel !== -1) {
                     this.taskListHigh.splice(indexDel, 1);
                     this.countProcessing--;
+                    this.eventEmitter.emit('taskUnQueue', job);
                 }
                 else
                     Logger.warn(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
@@ -162,6 +224,7 @@ export class Processor<T extends Task> {
                 if (indexDel !== -1) {
                     this.taskListLow.splice(indexDel, 1);
                     this.countProcessing--;
+                    this.eventEmitter.emit('taskUnQueue', job);
                 }
                 else
                     Logger.warn(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
@@ -172,101 +235,40 @@ export class Processor<T extends Task> {
                 if (indexDel !== -1) {
                     this.taskListMedium.splice(indexDel, 1);
                     this.countProcessing--;
+                    this.eventEmitter.emit('taskUnQueue', job);
                 }
                 else
                     Logger.warn(`Unknow job id [${job.id}] state [${job.stat}] Priority [${job.task.priority}]`);
                 break;
         }
 
-        this.eventEmitter.emit('taskUnQueue', job);
+
     }
-    RemoveFinishedJobsDEPRECATED() {
-        /*let deleteList: { id?: number, priority?: PRIORITY_QUEUE } = [];
-        this.getTaskListByPriority().forEach((job, index) => {
-            if (job.stat == STATUS.FINISHED || job.stat == STATUS.MAX_RETRIES) {
-                deleteList.push(index);
-                this.eventEmitter.emit('taskUnQueue', job);
-            }
-        });*/
 
-        let deletions = this.getTaskListByPriority().filter(job => job.stat == STATUS.FINISHED || job.stat == STATUS.MAX_RETRIES);
-        //console.log(deleteList);
-        deletions.forEach((del) => {
-            // this.taskList.splice(del, 1);
-            let indexDel = -1;
-            switch (del.task.priority) {
-                case PRIORITY_QUEUE.HIGH:
-                    indexDel = this.taskListHigh.findIndex(jobFind => jobFind.task.id === del.task.id);
-                    if (indexDel)
-                        this.taskListHigh.splice(indexDel, 1);
-                    break;
-
-                case PRIORITY_QUEUE.LOW:
-                    indexDel = this.taskListLow.findIndex(jobFind => jobFind.task.id === del.task.id);
-                    if (indexDel)
-                        this.taskListLow.splice(indexDel, 1);
-                    break;
-
-                case PRIORITY_QUEUE.MEDIUM:
-                    indexDel = this.taskListMedium.findIndex(jobFind => jobFind.task.id === del.task.id);
-                    if (indexDel)
-                        this.taskListMedium.splice(indexDel, 1);
-                    break;
-            }
-
-
-
-        });
-    }
     // Coleta tarefa para processar
     DeQueue() {
-        //let i = 0;
         let jobArray = [];
-        let processingJobs = this.CountProcessingJobs()/*this.countProcessing*/;
 
+        if (this.CountProcessingJobs() >= this.taskSize) {
+            return jobArray;
+        }
 
-        /*let taskHigh = this.taskList.filter(task =>
-            (task.stat === STATUS.PENDING || task.stat === STATUS.FAILED) &&
-            task.task.priority == PRIORITY_QUEUE.HIGH);
+        let i = 0;
+        for (const arr of ['taskListHigh', 'taskListMedium', 'taskListLow']) {
 
-        let taskMedium = this.taskList.filter(task =>
-            (task.stat === STATUS.PENDING || task.stat === STATUS.FAILED) &&
-            task.task.priority == PRIORITY_QUEUE.MEDIUM);
+            i = 0;
+            while (i < this[arr].length && (jobArray.length + this.CountProcessingJobs()) < this.taskSize) {
+                const job = this[arr][i];
+                if ((job.stat === STATUS.PENDING || job.stat === STATUS.FAILED) /*&&
+                (jobArray.length + processingJobs) < this.taskSize*/) {
+                    job.stat = STATUS.PROCESSING;
+                    this.eventEmitter.emit('taskProcessing', job);
+                    jobArray.push(job);
+                }
 
-        let taskLow = this.taskList.filter(task =>
-            (task.stat === STATUS.PENDING || task.stat === STATUS.FAILED) &&
-            task.task.priority == PRIORITY_QUEUE.LOW);
-
-        let selectedTasks: Job<T>[] = [];
-        selectedTasks = selectedTasks.concat(taskHigh, taskMedium, taskLow);*/
-
-        /*if (taskHigh.length > 0) {
-            selectedTasks = taskHigh;
-        } else if (taskMedium.length > 0) {
-            selectedTasks = taskMedium;
-        } else {
-            selectedTasks = taskLow;
-        }*/
-        // Logger.debug(`High: ${taskHigh.length} Low: ${taskLow.length} Medium: ${taskMedium.length}`);
-        //if (this.countProcessing < this.taskSize) {
-        this.getTaskListByPriority().forEach((job, index) => {
-            if ((job.stat == STATUS.PENDING || job.stat == STATUS.FAILED) &&
-                (jobArray.length + processingJobs) < this.taskSize) {
-                job.stat = STATUS.PROCESSING;
-                this.eventEmitter.emit('taskProcessing', job);
-                jobArray.push(job);
+                i++;
             }
-        });
-        // }
-
-        /*this.taskList.forEach((job, index) => {
-            if ((job.stat == STATUS.PENDING || job.stat == STATUS.FAILED) &&
-                (jobArray.length + processingJobs) < this.taskSize) {
-                job.stat = STATUS.PROCESSING;
-                this.eventEmitter.emit('taskProcessing', job);
-                jobArray.push(job);
-            }
-        });*/
+        }
 
         return jobArray;
     }

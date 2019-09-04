@@ -19,10 +19,16 @@ export interface ScanTasks {
     path: string;
     stop: boolean;
 }
+
+export interface ScanTasksHandlers extends ScanTasks {
+    interval: any;
+}
+
 export class WorkerScanProcess extends SystemWorker<any> {
     scannerDir = new events.EventEmitter();
     finishedScan = false;
     scanTasks: ScanTasks[] = [];
+    handlersTask: ScanTasksHandlers[] = [];
     private static _instance: WorkerScanProcess;
 
     public static get Instance(): WorkerScanProcess {
@@ -40,7 +46,7 @@ export class WorkerScanProcess extends SystemWorker<any> {
             return;
         }*/
 
-        switch (msg.type) {
+        /*switch (msg.type) {
             case 'CONTINUE_SCAN':
                 this.RequestScan();
                 break;
@@ -52,7 +58,7 @@ export class WorkerScanProcess extends SystemWorker<any> {
             case 'STOP_SCAN':
                 this.ScanDir(msg.data);
                 break;
-        }
+        }*/
     }
 
     RequestScan() {
@@ -69,6 +75,13 @@ export class WorkerScanProcess extends SystemWorker<any> {
         } else {
             Logger.warn(`Task Scan ${src} not found`);
         }
+
+        const handlers = this.handlersTask.find(el => el.path === src);
+
+        if (handlers && handlers.interval) {
+            clearInterval(handlers.interval);
+            Logger.warn(`Task Scan interval ${src} clear`);
+        }
     }
 
     InitSync() {
@@ -78,18 +91,18 @@ export class WorkerScanProcess extends SystemWorker<any> {
                 return;
             }
             for (let folder of folders) {
-                if (!fs.existsSync(folder)) {
-                    EntityFolderSync.Instance.DeleteFolder(folder, (err) => {
+                if (!fs.existsSync(folder.folderPath)) {
+                    EntityFolderSync.Instance.DeleteFolder(folder.folderPath, (err) => {
                         if (err)
                             Logger.error(err);
 
-                        Logger.warn(`Folder realtime sinch removed, folder not exists ${folder}`);
+                        Logger.warn(`Folder realtime sinch removed, folder not exists ${folder.folderPath}`);
                     });
                     return;
                 }
 
                 try {
-                    await this.ScanDir(folder);
+                    await this.ScanDir(folder.folderPath, folder.scanDelay);
                 } catch (scanErr) {
                     Logger.error(scanErr);
                 }
@@ -107,34 +120,28 @@ export class WorkerScanProcess extends SystemWorker<any> {
         }
     }
 
-    private AddUploadList(file: string, rootFolder: string) {
-        return new Promise((resolve, reject) => {
-            /*FunctionsBinding.Instance.ProcessFile([file], rootFolder, (err, rs) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
-            });*/
-            this.AppendFile(file, rootFolder, (err) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
-            });
-        });
-    }
+    /*  private AddUploadList(file: string, rootFolder: string) {
+          return new Promise((resolve, reject) => {
+  
+              this.AppendFile(file, rootFolder, (err) => {
+                  if (err) {
+                      reject(err);
+                  } else {
+                      resolve();
+                  }
+              });
+          });
+      }*/
 
-    private AppendFile(file, rootFolder, callback) {
-        let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
+    /* private AppendFile(file, rootFolder, callback) {
+         let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
+ 
+         /*if (!fs.existsSync(pathLog)) {
+             fs.mkdirSync(pathLog);
+         }*/
 
-        /*if (!fs.existsSync(pathLog)) {
-            fs.mkdirSync(pathLog);
-        }*/
-
-        fs.appendFile(source, `${file}\n`, callback);
-    }
+    // fs.appendFile(source, `${file}\n`, callback);
+    //}
 
     private AppendFastFile(files, rootFolder, callback) {
         let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
@@ -166,13 +173,15 @@ export class WorkerScanProcess extends SystemWorker<any> {
         }
     }
 
-    async ScanDir(src) {
+    async ScanDir(src, scanDelay: number) {
         try {
             return new Promise((resolve, reject) => {
-                this.scanTasks.push({
+                let taskData = {
                     path: src,
                     stop: false
-                });
+                };
+
+                this.scanTasks.push(taskData);
 
                 let actualSrc = '';
                 let sended = undefined;
@@ -240,6 +249,7 @@ export class WorkerScanProcess extends SystemWorker<any> {
                             if (err) {
                                 Logger.error(err);
                             }
+
                             const scTask = this.scanTasks.find(el => el.path === src);
                             if (scTask && !scTask.stop) {
                                 scanner.emit('next');
@@ -320,6 +330,23 @@ export class WorkerScanProcess extends SystemWorker<any> {
                     // MessageToWorker(WorkProcess.MASTER, { type: 'SCAN_DIR_NOTIFY', data: { folder: 'src', directory: '' } });
                     this.RemoveTask(src);
                     resolve();
+
+                    if (scanDelay) {
+                        Logger.debug(`Scan delay Enabled! Next Scan ${src} is ${scanDelay}`);
+                        this.handlersTask.push({
+                            ...taskData, interval: setTimeout(() => {
+                                const handlersIndex = this.handlersTask.findIndex(el => el.path === src);
+
+                                if (handlersIndex !== -1) {
+                                    this.handlersTask.splice(handlersIndex, 1);
+                                }
+
+                                this.ScanDir(src, scanDelay);
+                            }, scanDelay)
+                        });
+
+                    }
+
                 });
             });
 

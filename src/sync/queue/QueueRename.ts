@@ -59,6 +59,6 @@ export class QueueRename {
     }
 
     addJob(job: RenameTask) {
-        this.tasks.AddJob(job);
+        this.tasks.Enqueue(job);
     }
 }

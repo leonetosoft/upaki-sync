@@ -1,0 +1,59 @@
+{
+    "filePath": {
+        "C:\\Users\\Leonardo\\Desktop\\scheduled\\hcore\\CLIENTE UPLOAD.PNG": {
+            "stat": 1,
+            "task": {
+                "priority": "MEDIUM",
+                "state": "AWAIT",
+                "uploadType": "SIMPLE",
+                "numberErrors": 0,
+                "timeStamp": 1567536633764,
+                "lastLoaded": 0,
+                "session": {
+                    "Parts": [],
+                    "DataTransfered": 0
+                },
+                "file": {
+                    "sizeCache": 24216,
+                    "filePath": "C:\\Users\\Leonardo\\Desktop\\scheduled\\hcore\\CLIENTE UPLOAD.PNG",
+                    "rootFolder": "C:\\Users\\Leonardo\\Desktop\\scheduled",
+                    "key": "/hcore/CLIENTE UPLOAD.PNG"
+                },
+                "filePath": "C:\\Users\\Leonardo\\Desktop\\scheduled\\hcore\\CLIENTE UPLOAD.PNG",
+                "loaded": 0,
+                "upaki": {},
+                "id": "b5c8b640-ce7b-11e9-9e93-f1ea238b96bf"
+            },
+            "id": "b5c8b640-ce7b-11e9-9e93-f1ea238b96bf",
+            "processor": {
+                "countProcessing": 1,
+                "loopTime": 1000,
+                "retryDelay": 30000,
+                "maxRetries": 10,
+                "taskSize": 1,
+                "taskListHigh": [],
+                "taskListMedium": [],
+                "taskListLow": [],
+                "eventEmitter": {
+                    "domain": null,
+                    "_events": {},
+                    "_eventsCount": 5
+                },
+                "interval": {
+                    "_called": true,
+                    "_idleTimeout": 1000,
+                    "_idlePrev": {
+                        "_unrefed": false,
+                        "msecs": 1000,
+                        "_timer": {}
+                    },
+                    "_idleStart": 106221,
+                    "_repeat": 1000,
+                    "_destroyed": false
+                }
+            },
+            "retries": 0
+        }
+    },
+    "id": {}
+}

@@ -2,6 +2,8 @@ import * as crypto from 'crypto';
 import { Database } from '../Database';
 import { FolderObject } from '../../api/entity';
 import { Environment } from '../../config/env';
+import { WorkProcess } from '../../api/thread';
+import { SharedFuncion } from '../../ipc/EventBinding';
 
 export class EntityFolderMap {
     private static _instance: EntityFolderMap;
@@ -22,10 +24,18 @@ export class EntityFolderMap {
         return crypto.createHash('md5').update(src).digest("hex");
     }
 
+    @SharedFuncion({
+        mainWorter: WorkProcess.MASTER,
+        response: true
+    })
+    saveIpcFolder(upload: FolderObject, callback: (err: Error, data: any) => void) {
+        EntityFolderMap.Instance.save(upload, callback);
+    }
+
     save(folder: FolderObject, callback: (err: Error, data: any) => void) {
         let key = this.MD5SRC(folder.key);
         let data = JSON.stringify(folder);
-        Database.Instance.All(`SELECT data FROM ${this.table} WHERE key=? and user_id=?`, [key, Environment.config.credentials.userId], (err, row) => {
+        Database.Instance.All(`SELECT key FROM ${this.table} WHERE key=? and user_id=?`, [key, Environment.config.credentials.userId], (err, row) => {
             if (err) {
                 callback(err, undefined);
             } else {

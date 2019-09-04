@@ -14,15 +14,15 @@ export class EntityFolderSync {
         return this._instance || (this._instance = new this());
     }
 
-    public ListFolders(callback: (err: Error, folders: string[]) => void) {
-        Database.Instance.All('SELECT folder FROM sync_folder WHERE user_id=?', [Environment.config.credentials.userId], (err, rows) => {
-            callback(err, err ? [] : rows.map(el => { return el.folder; }));
+    public ListFolders(callback: (err: Error, folders: { folderPath: string, scanDelay: number, realtime: number }[]) => void) {
+        Database.Instance.All('SELECT folder, scan_delay, realtime FROM sync_folder WHERE user_id=?', [Environment.config.credentials.userId], (err, rows) => {
+            callback(err, err ? [] : rows.map(el => { return { folderPath: el.folder, scanDelay: Number(el.scan_delay), realtime: Number(el.realtime) }; }));
         });
     }
 
     public ListFoldersUi(callback: (err: Error, folders: SyncFolderObj[]) => void) {
-        Database.Instance.All('SELECT folder, delete_file, delete_on_finish FROM sync_folder WHERE user_id=?', [Environment.config.credentials.userId], (err, rows) => {
-            callback(err, err ? [] : rows.map(el => { return { folder: el.folder, delete_file: Number(el.delete_file), delete_on_finish: Number(el.delete_on_finish) }; }));
+        Database.Instance.All('SELECT folder, delete_file, delete_on_finish, scan_delay, realtime FROM sync_folder WHERE user_id=?', [Environment.config.credentials.userId], (err, rows) => {
+            callback(err, err ? [] : rows.map(el => { return { folder: el.folder, delete_file: Number(el.delete_file), delete_on_finish: Number(el.delete_on_finish), scan_delay: Number(el.scan_delay), realtime: Number(el.realtime) }; }));
         });
     }
 
@@ -52,16 +52,16 @@ export class EntityFolderSync {
         });
     }
 
-    public AddFolder(src: string, delete_on_finish, delete_file, callback: (err: Error) => void) {
-        Database.Instance.Run('INSERT INTO sync_folder (folder, user_id, delete_on_finish, delete_file) VALUES(?, ?, ?, ?)', [src, Environment.config.credentials.userId, delete_on_finish, delete_file], (err) => {
+    public AddFolder(src: string, delete_on_finish, delete_file, scan_delay = 0, realtime = 1, callback: (err: Error) => void) {
+        Database.Instance.Run('INSERT INTO sync_folder (folder, user_id, delete_on_finish, delete_file, scan_delay, realtime) VALUES(?, ?, ?, ?, ?, ?)', [src, Environment.config.credentials.userId, delete_on_finish, delete_file, scan_delay, realtime], (err) => {
             if (!err) {
-                FunctionsBinding.Instance.AddScanDir(src);
+                FunctionsBinding.Instance.AddScanDir(src, scan_delay);
                 FunctionsBinding.Instance.AddWatch(src);
             }
 
-            if(err && err.message && err.message.indexOf('SQLITE_CONSTRAINT') == -1) {
+            if (err && err.message && err.message.indexOf('SQLITE_CONSTRAINT') == -1) {
                 callback(err);
-            }else{
+            } else {
                 callback(undefined);
             }
         });
@@ -76,11 +76,11 @@ export class EntityFolderSync {
             callback(err);
         });
     }
-
-    public getRootFolder(src: string) {
-        this.ListFolders((err, rs) => {
-
-        })
-    }
-
+    /*
+        public getRootFolder(src: string) {
+            this.ListFolders((err, rs) => {
+    
+            })
+        }
+    */
 }

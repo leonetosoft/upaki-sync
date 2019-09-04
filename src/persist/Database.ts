@@ -14,6 +14,8 @@ import { QueueDatabaseExecution } from './queue/QueueDatabaseExecution';
 import { DatabaseExecutionTask } from './queue/DatabaseExecutionTask';
 import * as net from 'net';
 import { UIFunctionsBinding } from '../ipc/UIFunctionsBinding';
+import * as express from 'express';
+import * as bodyParser from 'body-parser';
 import * as http from 'http';
 export enum TYPE_DB_EXECUTIOM {
     GET = 'GET',
@@ -383,7 +385,7 @@ export class Database2 {
             this.timeoutChecker[idRequest] = setTimeout(() => {
                 let find = this.events.eventNames().find(el => el === idRequest);
                 if (find) {
-                    callback(new Error(`[${idRequest}]  Database Timeout error`), undefined);
+                    callback(new Error(`[${idRequest}]  Database Timeout error Timeout=${this.timeout} SQL-${sql ? sql : ''} PARAMS=${JSON.stringify(params)}`), undefined);
                 }
 
                 delete this.timeoutChecker[idRequest];
@@ -407,7 +409,7 @@ export class Database2 {
             this.timeoutChecker[idRequest] = setTimeout(() => {
                 let find = this.events.eventNames().find(el => el === idRequest);
                 if (find) {
-                    callback(new Error(`[${idRequest}]  Database Timeout error`), undefined);
+                    callback(new Error(`[${idRequest}]  Database Timeout error Timeout=${this.timeout} SQL-${sql ? sql : ''} PARAMS=${JSON.stringify(params)}`), undefined);
                 }
 
                 delete this.timeoutChecker[idRequest];
@@ -442,8 +444,9 @@ export class Database {
     private connection: sqlite3.Database;
     private isDBMaster = false;
     private events: events.EventEmitter;
-    private timeout = 180000 // 3 minutos;
+    private timeout = 30000 // 3 minutos;
     private PORT = 33333;
+    private MAX_RETRY = 5;
     private startingClinetConnection = false;
     private HOST = '127.0.0.1';
     private httpServer: http.Server;
@@ -467,39 +470,57 @@ export class Database {
     }
 
     private startServer() {
-        this.httpServer = http.createServer((req, res) => {
-            let data = [];
-            res.setHeader("Content-Type", "application/json");
-            req.on('data', chunk => {
-                data.push(chunk);
-            });
-            req.on('end', () => {
-                //console.log(req.connection.remoteAddress);
-                if (data && data.length) {
-                    //let dataReceive = JSON.parse(data as any); // 'Buy the milk'
-                    // console.log(dataReceive.zigue);
-                    if (data.toString() === 'REQUEST_MAXIMIZE') {
-                        UIFunctionsBinding.Instance.UpakiRequestMaximize();
-                        res.write('Maximize');
-                        res.end();
-                    } else {
-                        this.serverOnReceivePacket(data as any, res);
-                    }
-                }
+        let app = express();
 
+        app.use(bodyParser.json());
 
-
-                //???????????????
-                //UIFunctionsBinding.Instance.UpakiRequestMaximize();
-                /* setTimeout(() => {
-                     res.write('Hello World!');
-                     res.end();
-                 }, 5000);*/
-
-            })
-        }).listen(this.PORT, () => {
-            Logger.info(`Server database listening`);
+        app.listen(this.PORT, function () {
+            console.log('Example app listening on port 3000!');
         });
+
+        app.post('/', (req, res) => {
+            Logger.debug('Packet HTTP body=' + JSON.stringify(req.body));
+            //res.send('Hello World!');
+            /*console.log('esti');
+            console.log(req.body);*/
+            if(req.body.action && req.body.action === 'REQUEST_MAXIMIZE') {
+                UIFunctionsBinding.Instance.UpakiRequestMaximize();
+                res.send('Maximize');
+            } else {
+                this.serverOnReceivePacket(req.body, res);
+            }
+        });
+
+        /*
+                this.httpServer = http.createServer((req, res) => {
+                    try {
+                        let data = [];
+        
+                        res.setHeader("Content-Type", "application/json");
+                        req.on('data', chunk => {
+                            data.push(chunk);
+                        });
+                        req.on('end', () => {
+        
+                            if (data && data.length) {
+                                if (data.toString() === 'REQUEST_MAXIMIZE') {
+                                    UIFunctionsBinding.Instance.UpakiRequestMaximize();
+                                    res.write('Maximize');
+                                    res.end();
+                                } else {
+                                    this.serverOnReceivePacket(data as any, res);
+                                }
+                            }
+                        })
+                    } catch (errorRequest) {
+                        try { res.end(); } catch (_) { };
+                        Logger.error(errorRequest);
+                    }
+                }).listen(this.PORT, () => {
+                    Logger.info(`Server database listening`);
+                });
+        
+                this.httpServer.timeout = this.timeout;*/
     }
 
     /*private startClient() {
@@ -545,7 +566,7 @@ export class Database {
         });
     }*/
 
-    private sendHttpRequest(msg: SqliteRequestPacket) {
+    private sendHttpRequest(msg: SqliteRequestPacket, callBackErr: (err: any) => void) {
         var options = {
             "method": "POST",
             "hostname": this.HOST,
@@ -556,6 +577,7 @@ export class Database {
                 "cache-control": "no-cache"
             }
         };
+
 
         var req = http.request(options, (res) => {
             var chunks = [];
@@ -572,14 +594,16 @@ export class Database {
         });
 
         req.write(JSON.stringify(msg));
+        Logger.debug(`Send HTTP packet:` + JSON.stringify(msg));
         req.end();
 
         req.on("error", (err) => {
             Logger.error(err);
+            callBackErr(err);
         });
     }
 
-    private async sendPacketToServer(msg: SqliteRequestPacket) {
+    private async sendPacketToServer(msg: SqliteRequestPacket, callBackErr: (err: any) => void) {
         //Logger.assert(`${msg.id}: sendPacketToServer SQL: ${msg.sql} PARAMS: ${JSON.stringify(msg.params)} TYPE: ${msg.type}`);
         if (this.isDBMaster) {
             throw new Error('Send packet to server incorrect call in server mode');
@@ -590,14 +614,14 @@ export class Database {
         }
         else */if (this.startingClinetConnection) {
             setTimeout(() => {
-                this.sendPacketToServer(msg);
+                this.sendPacketToServer(msg, callBackErr);
             }, 1000);
             return;
         }
 
         //let msgBuffer = Buffer.from(JSON.stringify(msg));
         // this.client.write(/*msgBuffer*/JSON.stringify(msg) + '\n');
-        this.sendHttpRequest(msg);
+        this.sendHttpRequest(msg, callBackErr);
     }
 
     public sendPacketToClient(msg: SqliteResponsePacket, clientSocket: http.ServerResponse) {
@@ -624,55 +648,52 @@ export class Database {
         }
     }
 
-    private serverOnReceivePacket(msg: string, clientSocket: http.ServerResponse) {
-        let packet = JSON.parse(msg) as SqliteRequestPacket;
-
-        // Logger.assert(`${packet.id}: serverOnReceivePacket SQL: ${packet.sql} PARAMS: ${JSON.stringify(packet.params)} TYPE: ${packet.type}`);
-
-        /*if (packet.type === TYPE_DB_EXECUTIOM.RUN) {
-            let job = new DatabaseExecutionTask(packet, rinfo);
-            //job.priority = packet.type === TYPE_DB_EXECUTIOM.RUN ? PRIORITY_QUEUE.HIGH : PRIORITY_QUEUE.MEDIUM;
-            QueueDatabaseExecution.Instance.addJob(job);
-        } else {*/
-        this.connection.serialize(() => {
-            switch (packet.type) {
-                case TYPE_DB_EXECUTIOM.RUN:
-                    this.Run(packet.sql, packet.params, (err) => {
+    private serverOnReceivePacket(msg: SqliteRequestPacket, clientSocket: http.ServerResponse) {
+        try {
+            let packet = msg/*JSON.parse(msg) as SqliteRequestPacket*/;
+            //this.connection.serialize(() => {
+                switch (packet.type) {
+                    case TYPE_DB_EXECUTIOM.RUN:
+                        this.Run(packet.sql, packet.params, (err) => {
 
 
-                        this.sendPacketToClient({
-                            id: packet.id,
-                            rs: '',
-                            err: err ? err.message : undefined
-                        }, clientSocket);
-                    })
-                    break;
+                            this.sendPacketToClient({
+                                id: packet.id,
+                                rs: '',
+                                err: err ? err.message : undefined
+                            }, clientSocket);
+                        })
+                        break;
 
-                case TYPE_DB_EXECUTIOM.GET:
-                    this.Get(packet.sql, packet.params, (err, row) => {
+                    case TYPE_DB_EXECUTIOM.GET:
+                        this.Get(packet.sql, packet.params, (err, row) => {
 
-                        this.sendPacketToClient({
-                            id: packet.id,
-                            rs: row,
-                            err: err ? err.message : undefined
-                        }, clientSocket);
-                    })
-                    break;
+                            this.sendPacketToClient({
+                                id: packet.id,
+                                rs: row,
+                                err: err ? err.message : undefined
+                            }, clientSocket);
+                        })
+                        break;
 
-                case TYPE_DB_EXECUTIOM.ALL:
-                    this.All(packet.sql, packet.params, (err, row) => {
+                    case TYPE_DB_EXECUTIOM.ALL:
+                        this.All(packet.sql, packet.params, (err, row) => {
 
 
-                        this.sendPacketToClient({
-                            id: packet.id,
-                            rs: row,
-                            err: err ? err.message : undefined
-                        }, clientSocket);
-                    })
-                    break;
-            }
-        });
+                            this.sendPacketToClient({
+                                id: packet.id,
+                                rs: row,
+                                err: err ? err.message : undefined
+                            }, clientSocket);
+                        })
+                        break;
+                }
+            //});
 
+        } catch (error) {
+            clientSocket.statusCode = 500;
+            clientSocket.end();
+        }
         /*}*/
     }
 
@@ -747,44 +768,102 @@ export class Database {
          );`, () => { });*/
     }
 
-    public Run(sql: string, params: any[], callback?: (err: Error | null) => void) {
+    private sendRemoteExecution(sql: string, params: any[], callback?: any, type?: TYPE_DB_EXECUTIOM, idRequest = undefined, retryCount = 0) {
+        if (!idRequest) {
+            idRequest = uuidv1();
+        }
+
+        Logger.debug(`Database ${retryCount > 0 ? 'RETRY' : ''} Request Execution: ${sql}`);
+        this.events.once(idRequest, callback);
+
+        this.timeoutChecker[idRequest] = setTimeout(() => {
+            let find = this.events.eventNames().find(el => el === idRequest);
+            if (find) {
+                if (retryCount < this.MAX_RETRY) {
+                    retryCount++;
+                    switch (type) {
+                        case TYPE_DB_EXECUTIOM.RUN:
+                            this.Run(sql, params, callback, idRequest, retryCount);
+                            break;
+
+                        case TYPE_DB_EXECUTIOM.ALL:
+                            this.All(sql, params, callback, idRequest, retryCount);
+                            break;
+
+                        case TYPE_DB_EXECUTIOM.GET:
+                            this.Get(sql, params, callback, idRequest, retryCount);
+                            break;
+                    }
+                } else {
+                    try {
+                        callback(new Error(`(${type.toString()})[${idRequest}] Database Timeout error - Timeout=${this.timeout} SQL-${sql ? sql : ''} PARAMS=${JSON.stringify(params)}`));
+                    } catch (error) {
+                        callback(new Error(`(${type.toString()})[${idRequest}] Database Timeout error`));
+                    }
+                }
+            }
+
+            delete this.timeoutChecker[idRequest];
+        }, this.timeout);
+
+
+        this.sendPacketToServer({
+            sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: type
+        }, (err) => {
+            Logger.warn('HTTP Error .... process failed');
+            clearInterval(this.timeoutChecker[idRequest]);
+            callback(err);
+        });
+    }
+
+    public Run(sql: string, params: any[], callback?: (err: Error | null) => void, idRequest = undefined, retryCount = 0) {
         if (this.isDBMaster) {
             Logger.debug(`Database Execution: ${sql}`);
             this.connection.run(sql, params, callback);
         } else {
-            let idRequest = uuidv1();
-            Logger.debug(`Database Request Execution: ${sql}`);
-            this.events.once(idRequest, callback);
-
-            this.timeoutChecker[idRequest] = setTimeout(() => {
-                let find = this.events.eventNames().find(el => el === idRequest);
-                if (find) {
-                    callback(new Error(`[${idRequest}] Database Timeout error - Timeout=${this.timeout} SQL-${sql ? sql : ''} PARAMS=${JSON.stringify(params)}`));
-                }
-
-                delete this.timeoutChecker[idRequest];
-            }, this.timeout);
-
-
-            this.sendPacketToServer({
-                sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.RUN
-            });
+            this.sendRemoteExecution(sql, params, callback, TYPE_DB_EXECUTIOM.RUN, idRequest, retryCount);
+            /* if (!idRequest) {
+                 idRequest = uuidv1();
+             }
+ 
+             Logger.debug(`Database ${retryCount > 0 ? 'RETRY' : ''} Request Execution: ${sql}`);
+             this.events.once(idRequest, callback);
+ 
+             this.timeoutChecker[idRequest] = setTimeout(() => {
+                 let find = this.events.eventNames().find(el => el === idRequest);
+                 if (find) {
+                     if (retryCount < this.MAX_RETRY) {
+                         retryCount++;
+                         this.Run(sql, params, callback, idRequest, retryCount);
+                     } else {
+                         callback(new Error(`(Run)[${idRequest}] Database Timeout error - Timeout=${this.timeout} SQL-${sql ? sql : ''} PARAMS=${JSON.stringify(params)}`));
+                     }
+                 }
+ 
+                 delete this.timeoutChecker[idRequest];
+             }, this.timeout);
+ 
+ 
+             this.sendPacketToServer({
+                 sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.RUN
+             });*/
         }
     }
 
-    public Get(sql: string, params: any[], callback?: (err: Error | null, row: any) => void) {
+    public Get(sql: string, params: any[], callback?: (err: Error | null, row: any, ) => void, idRequest = undefined, retryCount = 0) {
         if (this.isDBMaster) {
             Logger.debug(`Database Execution: ${sql}`);
             this.connection.get(sql, params, callback);
         } else {
-            let idRequest = uuidv1();
+            this.sendRemoteExecution(sql, params, callback, TYPE_DB_EXECUTIOM.GET, idRequest, retryCount);
+            /*let idRequest = uuidv1();
             Logger.debug(`Database Request Execution: ${sql}`);
             this.events.once(idRequest, callback);
 
             this.timeoutChecker[idRequest] = setTimeout(() => {
                 let find = this.events.eventNames().find(el => el === idRequest);
                 if (find) {
-                    callback(new Error(`[${idRequest}]  Database Timeout error`), undefined);
+                    callback(new Error(`(Get)[${idRequest}]  Database Timeout error Timeout=${this.timeout} SQL-${sql ? sql : ''} PARAMS=${JSON.stringify(params)}`), undefined);
                 }
 
                 delete this.timeoutChecker[idRequest];
@@ -792,31 +871,34 @@ export class Database {
 
             this.sendPacketToServer({
                 sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.GET
-            });
+            });*/
         }
     }
 
-    public All(sql: string, params: any[], callback?: (err: Error | null, rows: any[]) => void) {
+    public All(sql: string, params: any[], callback?: (err: Error | null, rows: any[]) => void, idRequest = undefined, retryCount = 0) {
         if (this.isDBMaster) {
             Logger.debug(`Database Execution: ${sql}`);
             this.connection.all(sql, params, callback);
         } else {
-            let idRequest = uuidv1();
-            Logger.debug(`Database Request Execution: ${sql}`);
-            this.events.once(idRequest, callback);
-
-            this.timeoutChecker[idRequest] = setTimeout(() => {
-                let find = this.events.eventNames().find(el => el === idRequest);
-                if (find) {
-                    callback(new Error(`[${idRequest}]  Database Timeout error`), undefined);
-                }
-
-                delete this.timeoutChecker[idRequest];
-            }, this.timeout);
-
-            this.sendPacketToServer({
-                sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.ALL
-            });
+            this.sendRemoteExecution(sql, params, callback, TYPE_DB_EXECUTIOM.ALL, idRequest, retryCount);
+            /* let idRequest = uuidv1();
+             Logger.debug(`Database Request Execution: ${sql}`);
+             this.events.once(idRequest, callback);
+ 
+             let tryRequest = 0;
+ 
+             this.timeoutChecker[idRequest] = setTimeout(() => {
+                 let find = this.events.eventNames().find(el => el === idRequest);
+                 if (find) {
+                     callback(new Error(`(All)[${idRequest}]  Database Timeout error Timeout=${this.timeout} SQL-${sql ? sql : ''} PARAMS=${JSON.stringify(params)}`), undefined);
+                 }
+ 
+                 delete this.timeoutChecker[idRequest];
+             }, this.timeout);
+ 
+             this.sendPacketToServer({
+                 sql: sql, id: idRequest, worker: Environment.config.worker, params: params, type: TYPE_DB_EXECUTIOM.ALL
+             });*/
         }
     }
 

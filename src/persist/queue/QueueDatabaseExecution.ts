@@ -37,7 +37,7 @@ export class QueueDatabaseExecution {
         Logger.info(`[TaskDatabaseExecution] - Queue initialized taskSize[${Environment.config.queue.database.taskSize}] maxRetries[${Environment.config.queue.renameAction.maxRetries}] retryDelay[${Environment.config.queue.renameAction.retryDelay}]`)
 
         this.tasks.Event('taskFinish', (task) => {
-            Logger.debug(`[TaskDatabaseExecution] - Process ended id ${task.id} await process [ ${this.tasks.getTaskListByPriority().length}, processing [${this.tasks.CountProcessingJobs()}]]`);
+            Logger.debug(`[TaskDatabaseExecution] - Process ended id ${task.id}, processing [${this.tasks.CountProcessingJobs()}]]`);
         });
 
         this.tasks.Event('taskRetry', (task) => {
@@ -64,6 +64,6 @@ export class QueueDatabaseExecution {
             this.initTasks();
         }
 
-        this.tasks.AddJob(job);
+        this.tasks.Enqueue(job);
     }
 }

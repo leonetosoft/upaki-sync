@@ -28,4 +28,6 @@ export interface SyncFolderObj {
     folder: string;
     delete_file: number;
     delete_on_finish: number;
+    scan_delay: number;
+    realtime: number;
 }

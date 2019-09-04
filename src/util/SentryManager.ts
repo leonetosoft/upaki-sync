@@ -58,7 +58,6 @@ export class SentryManager {
             });
 
             Sentry.captureException(error);
-console.log('sended');
         } catch (err) {
             console.log(err);
             Sentry.configureScope(scope => {

@@ -45,8 +45,8 @@ export class FunctionsBinding {
         mainWorter: WorkProcess.WORKER_SCAN_PROCESS,
         response: false
     })
-    AddScanDir(src: string) {
-        WorkerScanProcess.Instance.ScanDir(src);
+    AddScanDir(src: string, scan_delay: number) {
+        WorkerScanProcess.Instance.ScanDir(src, scan_delay);
     }
 
     @SharedFuncion({
@@ -76,50 +76,67 @@ export class FunctionsBinding {
         response: false
     })
     ProcessFileLoteV2(rootFolder: string/*, callback: (err, rs) => void*/) {
-        try {
-            let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
-            if (!fs.existsSync(source)) {
-                Logger.warn(`File ${source} not exists in loc !!! realtime sinc not upload ...`);
-                return;
-            }
-            var instream = fs.createReadStream(source);
-            var rl = readline.createInterface(instream);
+        let retryCount = 0;
 
-            rl.on('line', (line) => {
-                // console.log(line);
-                if (line && line !== '') {
-                    //WorkerProcessFile.Instance.PutFileQueue(line, rootFolder);
+        let tryReadingFile = () => {
+            try {
+                let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
 
+                if (!fs.existsSync(source)) {
+                    Logger.warn(`File ${source} not exists in loc !!! realtime sinc not upload ...`);
+                    return;
+                }
+                var instream = fs.createReadStream(source);
+                var rl = readline.createInterface(instream);
+
+                rl.on('line', (line) => {
+                    // console.log(line);
+                    if (line && line !== '') {
+                        //WorkerProcessFile.Instance.PutFileQueue(line, rootFolder);
+
+                        try {
+                            let filePaths = line.split(';');
+
+                            let sessionData = filePaths[1] != 'null' ? JSON.parse(new Buffer(filePaths[1], 'base64').toString('utf8')) : {
+                                Parts: [],
+                                DataTransfered: 0
+                            };
+
+                            FunctionsBinding.Instance.UploadFile(filePaths[0], sessionData, rootFolder, (err, rs) => {
+                                if (err) {
+                                    Logger.error(err);
+                                }
+                            });
+                        } catch (error) {
+                            Logger.error(error);
+                        }
+
+                    }
+                });
+
+                rl.on('close', () => {
                     try {
-                        let filePaths = line.split(';');
-
-                        let sessionData = filePaths[1] != 'null' ? JSON.parse(new Buffer(filePaths[1], 'base64').toString('utf8')) : {
-                            Parts: [],
-                            DataTransfered: 0
-                        };
-    
-                        FunctionsBinding.Instance.UploadFile(filePaths[0], sessionData, rootFolder, (err, rs) => {
-                            if(err) {
-                                Logger.error(err);
-                            }
-                        }); 
+                        fs.unlinkSync(source);
                     } catch (error) {
                         Logger.error(error);
                     }
+                });
+            } catch (error) {
+                if (error.code && (error.code === 'EBUSY' || error.code === 'EPERM') && retryCount < 3) {
+                    Logger.warn(`${error.code} to read scanned folder!! retry 1500`);
                     
-                }
-            });
-
-            rl.on('close', () => {
-                try {
-                    fs.unlinkSync(source);
-                } catch (error) {
+                    setTimeout(() => {
+                        tryReadingFile();
+                    }, 1500);
+                    retryCount++;
+                } else {
                     Logger.error(error);
                 }
-            });
-        } catch (error) {
-            Logger.error(error);
+                //Logger.error(error);
+            }
         }
+
+        tryReadingFile();
     }
 
     @SharedFuncion({
@@ -237,7 +254,7 @@ export class FunctionsBinding {
     })
     RequestUpdateUiUpload() {
         try {
-           WorkerUpload.Instance.UpdateUiList();
+            WorkerUpload.Instance.UpdateUiList();
         } catch (error) {
             Logger.error(error);
         }

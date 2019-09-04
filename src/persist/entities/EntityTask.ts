@@ -116,8 +116,17 @@ export class EntityTask {
                     for (let row of rows) {
                         if (row.pdata) {
                             Util.ReadTaskData(`${row.pname}`, ((errReadTask, data, cacheSource) => {
+                                
                                 if (errReadTask) {
-                                    Logger.error(errReadTask);
+
+                                    if(errReadTask.message && errReadTask.message.indexOf('Unexpected token') !== -1) {
+                                        Logger.warn(`Data of task ${row.pname} invalid Json ${errReadTask.message}`);
+                                    } else if(errReadTask.message && errReadTask.message.indexOf('Unexpected end of JSON input') !== -1) {
+                                        Logger.warn(`Empty JSON of task ${row.pname} invalid Json ${errReadTask.message}`);
+                                    } else {
+                                        Logger.error(errReadTask);
+                                    }
+
                                 } else {
                                     UIFunctionsBinding.Instance.UpdateTaskDefinition(row, cacheSource);
                                 }
@@ -185,7 +194,16 @@ export class EntityTask {
                 Util.ReadTaskData<T>(`${row.pname}`, (errReadTask, data, cacheSource) => {
                     if (errReadTask) {
                         /*reject(errReadTask);*/
-                        Logger.error(errReadTask);
+                        // Logger.error(errReadTask);
+
+                        if(errReadTask.message && errReadTask.message.indexOf('Unexpected token') !== -1) {
+                            Logger.warn(`Data of task ${row.pname} invalid Json ${errReadTask.message}`);
+                        } else if(errReadTask.message && errReadTask.message.indexOf('Unexpected end of JSON input') !== -1) {
+                            Logger.warn(`Empty JSON of task ${row.pname} invalid Json ${errReadTask.message}`);
+                        } else {
+                            Logger.error(errReadTask);
+                        }
+                        
                         resolve({
                             pdata: undefined,
                             pname: row.pname,

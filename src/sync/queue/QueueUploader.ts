@@ -4,14 +4,12 @@ import { Job } from "./../../queue/job";
 import { Environment } from '../../config/env';
 import { Logger } from '../../util/Logger';
 import { WorkerUpload } from '../../thread/WorkerUpload';
-import { EntityFolderSync } from '../../persist/entities/EntityFolderSync';
-import { Util } from '../../util/Util';
-import * as rmdir from 'rmdir';
 import { EntityParameter } from '../../persist/entities/EntityParameter';
 
 export class QueueUploader {
     private static _instance: QueueUploader;
     tasks: Processor<UploaderTask>;
+    totalUploadBytes = 0;
     constructor() {
         // this.initTasks();
     }
@@ -32,24 +30,24 @@ export class QueueUploader {
     }
 
     private async checkUploads(job: Job<UploaderTask>) {
-        if (await EntityFolderSync.Instance.DeleteOnFinish(job.task.file.rootFolder)) {
-            let totalSending = this.tasks.getTaskListByPriority().filter(el => el.task.file.rootFolder === job.task.file.rootFolder);
-            if (totalSending.length === 0) {
-                EntityFolderSync.Instance.DeleteFolder(job.task.file.rootFolder, (errDel) => {
-                    if (!errDel) {
-                        /*rmdir(job.task.file.rootFolder, (er, dirs, files) => {
-                            if (er) {
-                                Logger.error(er);
-                            } else {
-                                Logger.info(`Deleted ${dirs ? dirs.length : 0} directories and ${files ? files.length : 0} files`);
-                            }
-                        })*/
-                    } else {
-                        Logger.error(errDel);
-                    }
-                });
+        //deprecated
+        
+       /* try {
+            if (await EntityFolderSync.Instance.DeleteOnFinish(job.task.file.rootFolder)) {
+                let totalSending = this.tasks.getTaskListByPriority().filter(el => el.task.file.rootFolder === job.task.file.rootFolder);
+                if (totalSending.length === 0) {
+                    EntityFolderSync.Instance.DeleteFolder(job.task.file.rootFolder, (errDel) => {
+                        if (!errDel) {
+
+                        } else {
+                            Logger.error(errDel);
+                        }
+                    });
+                }
             }
-        }
+        } catch (error) {
+            Logger.error(error);
+        }*/
     }
 
 
@@ -65,8 +63,9 @@ export class QueueUploader {
                 retryDelay: Environment.config.queue.uploader.retryDelay*/
                 taskSize: parseInt(parameters['MAX_UPLOAD_QUEUE']),
                 maxRetries: parseInt(parameters['MAX_RETRY_UPLOAD']),
-                retryDelay: parseInt(parameters['UPLOAD_RETRY_DELAY'])
-            });
+                retryDelay: parseInt(parameters['UPLOAD_RETRY_DELAY']),
+                indexes: ['filePath']
+            }, true);
 
         WorkerUpload.Instance.eventParams.on('MAX_UPLOAD_QUEUE', (value) => {
             Logger.debug('Change MAX_UPLOAD_QUEUE to ' + value);
@@ -102,20 +101,23 @@ export class QueueUploader {
             Logger.warn(`Upload File Process max retries id ${task.id}`);
         });
 
-        this.tasks.Event('taskUnQueue', (task) => {
+        this.tasks.Event('taskUnQueue', (task: Job<UploaderTask>) => {
             Logger.debug(`Upload File Process removed from queue id ${task.id}`);
+            this.totalUploadBytes -= task.task.file.getSize(true);
             WorkerUpload.Instance.sendUploadList();
             this.checkUploads(task);
         });
     }
-    isAlreadyUploading(path) {
-        return this.tasks.getTaskListByPriority().findIndex(el => el.task.file.filePath === path) !== -1;
-    }
+
     addJob(job: UploaderTask) {
-        if (!this.isAlreadyUploading(job.file.filePath)) {
-            this.tasks.AddJob(job);
-        } else {
+        const byFilePath = this.tasks.byIndex('filePath', job.file.filePath);
+        if(byFilePath) {
             Logger.warn(`File  ${job.file.filePath} already uploading!`);
+            return;
         }
+        if(job.file.getSize(true)) {
+            this.totalUploadBytes += job.file.getSize(true);
+        }
+        this.tasks.Enqueue(job);
     }
 }

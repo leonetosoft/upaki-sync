@@ -3,6 +3,8 @@ import { Database } from '../Database';
 import { EntityUploadData } from '../../api/entity';
 import { Environment } from '../../config/env';
 import { Logger } from '../../util/Logger';
+import { SharedFuncion } from '../../ipc/EventBinding';
+import { WorkProcess } from '../../api/thread';
 
 export class EntityUpload {
     private static _instance: EntityUpload;
@@ -19,6 +21,14 @@ export class EntityUpload {
         return crypto.createHash('md5').update(src).digest("hex");
     }
 
+    @SharedFuncion({
+        mainWorter: WorkProcess.MASTER,
+        response: true
+    })
+    saveIpc(upload: EntityUploadData, callback: (err: Error, data: any) => void) {
+        EntityUpload.Instance.save(upload, callback);
+    }
+    
     save(upload: EntityUploadData, callback: (err: Error, data: any) => void) {
         let key = this.MD5SRC(upload.path);
         let data = JSON.stringify(upload);

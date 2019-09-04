@@ -2,6 +2,7 @@ import { Task } from './task';
 import { Processor } from './processor';
 import { STATUS } from './stat';
 import * as uuidv1 from 'uuid/v1';
+import { Logger } from '../util/Logger';
 
 export class Job<T extends Task> {
     public task: T;
@@ -9,6 +10,7 @@ export class Job<T extends Task> {
     public id: string;
     private processor: Processor<T>;
     private retries: number;
+    private retryTimeout;
 
     constructor(task: T, processor) {
         this.task = task;
@@ -33,11 +35,17 @@ export class Job<T extends Task> {
             this.stat = STATUS.MAX_RETRIES;
             this.processor.RemoveFinishedJob(this);
         } else {
-            setTimeout(() => {
+            if(this.retryTimeout) {
+                Logger.warn(`Task ${this.id} already restry !!! await!`);
+                return;
+            }
+            this.retryTimeout = setTimeout(() => {
+                this.retryTimeout = undefined;
+                
                 this.processor.eventEmitter.emit('taskRetry', this);
                 this.retries++;
                 this.stat = STATUS.FAILED;
-
+                this.processor.countProcessing--;
             }, retryTime);
         }
     }

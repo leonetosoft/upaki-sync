@@ -42,7 +42,12 @@ export class EntityUpload {
                     });
                 } else {
                     Database.Instance.Run(`INSERT INTO ${this.table}(key, data, user_id) VALUES(?,?,?)`, [key, data, Environment.config.credentials.userId], (errInsert) => {
-                        callback(errInsert, undefined);
+                        if(errInsert && (errInsert as any).code && (errInsert as any).code === 'SQLITE_CONSTRAINT') {
+                            Logger.warn(`Key ${key} already saved in db - path: ${upload.path}`);
+                            callback(undefined, undefined);
+                        } else {
+                            callback(errInsert, undefined);
+                        }
                     });
                 }
             }

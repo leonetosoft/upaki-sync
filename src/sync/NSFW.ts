@@ -48,6 +48,7 @@ export class NSFW extends NativeEventsEmitter {
     rootDir: string;
     whatch: any;
     awaitingCopy: ChangesWhatch[] = [];
+    changesDebounce;
     constructor(rootDir: string) {
         super();
         this.rootDir = rootDir;
@@ -126,7 +127,13 @@ export class NSFW extends NativeEventsEmitter {
         filterChanges.forEach(evtEmit => {
             switch (evtEmit.action) {
                 case Action.MODIFIED:
-                    this.emit('MODIFIED', evtEmit);
+                    // debounce changes in file
+                    if(this.changesDebounce) {
+                        clearTimeout(this.changesDebounce);
+                    }
+                    this.changesDebounce = setTimeout(() => {
+                        this.emit('MODIFIED', evtEmit);
+                    }, 1500);
                     break;
                 case Action.DELETED:
                     this.emit('DELETED', evtEmit);

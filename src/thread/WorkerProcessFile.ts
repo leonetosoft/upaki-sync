@@ -11,6 +11,7 @@ import { UploadState } from '../sync/task/UploaderTask';
 import { SystemWorker } from "./SystemWorker";
 import { FunctionsBinding } from "../ipc/FunctionsBinding";
 import { WorkProcess } from "../api/thread";
+import { STOP_UPLOAD_DESCRIPTOR } from "../api/stopUploadDescriptor";
 //import { Util } from "../util/Util";
 
 export class WorkerProcessFile extends SystemWorker<any> {
@@ -97,7 +98,7 @@ export class WorkerProcessFile extends SystemWorker<any> {
                             try {
                                 fs.accessSync(data.key, fs.constants.R_OK);
 
-                                FunctionsBinding.Instance.StopUpload(data.oldKey);
+                                FunctionsBinding.Instance.StopUpload(data.oldKey, STOP_UPLOAD_DESCRIPTOR.FILE_RENAME);
                                 let job = new FileTask(new File(data.key, data.rootFolder), FileTypeAction.ADD);
                                 job.priority = PRIORITY_QUEUE.HIGH;
                                 QueueFile.Instance.addJob(job);

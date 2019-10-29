@@ -31,6 +31,10 @@ export interface SqliteRequestPacket {
     type: TYPE_DB_EXECUTIOM;
 }
 
+export interface SqlLiteErr {
+    errno?: number; code?: string;
+}
+
 export interface SqliteResponsePacket {
     id: string;
     rs: any;

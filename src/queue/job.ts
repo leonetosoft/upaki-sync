@@ -24,6 +24,10 @@ export class Job<T extends Task> {
     }
 
     Finish() {
+        if(this.stat === STATUS.FINISHED) {
+            return;
+        }
+        
         this.stat = STATUS.FINISHED;
         this.processor.eventEmitter.emit('taskFinish', this);
         this.processor.RemoveFinishedJob(this);

@@ -13,6 +13,7 @@ import { EntityFolderSync } from '../../persist/entities/EntityFolderSync';
 import * as fs from 'fs';
 import { EntityParameter } from '../../persist/entities/EntityParameter';
 import { STATUS } from '../../queue/stat';
+import { STOP_UPLOAD_DESCRIPTOR } from '../../api/stopUploadDescriptor';
 
 export enum UploadState {
     AWAIT = 'AWAIT',
@@ -25,7 +26,8 @@ export enum UploadState {
     FINISH = 'FINISH',
     REMOVED = 'REMOVED',
     REINIT = 'REINIT',
-    LOCKED = 'LOCKED'
+    LOCKED = 'LOCKED',
+    SIGIN = 'SIGIN'
 }
 
 export enum UploadType {
@@ -43,6 +45,8 @@ export class UploaderTask extends Task {
     uploadType: UploadType = UploadType.SIMPLE;
     compactContent: boolean;
 
+    UPLOAD_TIMEOUT = 0;
+
     simpleUploadeEmitter: UploadEvents;
     multipartUploadEmitter: S3StreamEvents;
 
@@ -54,6 +58,8 @@ export class UploaderTask extends Task {
     speedBps: number;
     speedType: string;
     speed: number;
+
+    signatureId: string;
 
     file_id: string;
     folder_id: string;
@@ -104,11 +110,17 @@ export class UploaderTask extends Task {
         let requestDeletion = async () => {
             try {
                 if (await EntityFolderSync.Instance.DeleteOnSend(this.file.rootFolder)) {
-                    fs.unlinkSync(this.file.filePath);
+
+                    if (fs.existsSync(this.file.filePath)) {
+                        fs.unlinkSync(this.file.filePath);
+                    } else {
+                        Logger.warn(`File ${this.file.filePath} not exits not possible fs.unlinkSync task ${this.id}`);
+                    }
+
                     await EntityUpload.Instance.delete(this.file.filePath);
-                   // if (this.file.rootFolder !== Util.getPathNameFromFile(this.file.filePath)) {
-                       // Util.cleanEmptyFoldersRecursively(Util.getPathNameFromFile(this.file.filePath));
-                   // }
+                    // if (this.file.rootFolder !== Util.getPathNameFromFile(this.file.filePath)) {
+                    // Util.cleanEmptyFoldersRecursively(Util.getPathNameFromFile(this.file.filePath));
+                    // }
                 }
             } catch (error) {
                 if (error.code && error.code === 'EBUSY' && retryCount < 4) {
@@ -125,7 +137,7 @@ export class UploaderTask extends Task {
         requestDeletion();
     }
 
-    Cancel() {
+    Cancel(descriptor: STOP_UPLOAD_DESCRIPTOR) {
         if (this.job.stat === STATUS.FINISHED) {
             Logger.warn(`Request cancel uploading jog already finished ${this.file.getFullName()}`)
             return;
@@ -136,14 +148,59 @@ export class UploaderTask extends Task {
             return;
         }
 
-        Logger.warn(`Request cancel uploading ${this.file.getFullName()}`);
+        // o arquivo mudou seu conteudo
+        // o estado dele esta aguardando
+        // nao foram feitas transferencias (this.session.DataTransfered === 0) 
+        // entao ignora este evento 
+        if ((descriptor === STOP_UPLOAD_DESCRIPTOR.FILE_CHANGE &&
+            this.state === UploadState.AWAIT) && this.session.DataTransfered === 0) {
+            return;
+        }
+
+        Logger.warn(`Request cancel uploading ${this.file.getFullName()} description ${descriptor}`);
+
+        // tomar uma decisão dependendo do tipo do evento de cancelamento
+        // caso for um evento de file change quer dizer que houve mudanca no conteudo
+        // este deve ser zerado para posteriormente se reenviado do estado inicial
+        let doAction = descriptor === STOP_UPLOAD_DESCRIPTOR.FILE_CHANGE ? () => {
+            try {
+                Logger.warn(`File ${this.file.filePath} reinit session by Cancel descriptor FILE_CHANGE ...`);
+                this.session = {
+                    Parts: [],
+                    DataTransfered: 0
+                };
+                this.state = UploadState.REINIT;
+
+            } catch (err) {
+                Logger.error(err);
+            } finally {
+                try {
+                    this.save();
+                } catch (error) {
+                    Logger.error(error);
+                }
+                this.job.Fail(5000);
+            }
+        } : () => {
+            Logger.warn(`Job ${this.job.id} of file ${this.file.filePath} canceled by descriptor ${descriptor}`);
+
+            /*
+            FILE_UNLINK = 'File Unlink',
+            FILE_CHANGE = 'File Change',
+            FILE_NOT_FOUND_MULTIPART_READY = 'The file not found on ready',
+            FILE_NOT_FOUND_MULTIPART_RETRY = 'The file not found in retry',
+            FILE_NOT_FOUND_MULTIPART_UPLOAD_PART = 'The file removed on upload part',
+            FILE_RENAME = 'File renamed'
+            */
+
+            this.job.Finish();
+        };
 
         if (this.simpleUploadeEmitter || this.multipartUploadEmitter) {
-
-
             let deadLockCancel = setTimeout(() => {
                 Logger.warn(`Stop upload of ${this.file.getFullName()} deadlock cencel detected, force closing!!!`);
-                this.job.Finish();
+                //this.job.Finish();
+                doAction();
             }, 30000);
 
             this.state = UploadState.STOP;
@@ -153,7 +210,8 @@ export class UploaderTask extends Task {
                     //this.state = UploadState.STOP;
                     Logger.warn(`Job canceled, file changed ? ${this.file.getFullName()}`);
                     clearTimeout(deadLockCancel);
-                    this.job.Finish();
+                    //this.job.Finish();
+                    doAction();
                 })
                 this.simpleUploadeEmitter.emit('abort');
             } else {
@@ -162,12 +220,14 @@ export class UploaderTask extends Task {
                     //this.state = UploadState.STOP;
                     Logger.warn(`Job canceled, file changed ? ${this.file.getFullName()}`);
                     clearTimeout(deadLockCancel);
-                    this.job.Finish();
+                    //this.job.Finish();
+                    doAction();
                 })
                 this.multipartUploadEmitter.emit('abort');
             }
         } else {
-            this.job.Finish();
+            //this.job.Finish();
+            doAction();
         }
     }
 
@@ -203,8 +263,10 @@ export class UploaderTask extends Task {
                 this.file_id = data.file_id;
                 this.Etag = data.Etag;
                 this.state = UploadState.FINISH;
-                this.save();
-                this.OnUploadFinish();
+                // deletar somente após salvar
+                this.save((err) => {
+                    this.OnUploadFinish();
+                });
                 this.job.Finish();
             });
 
@@ -278,12 +340,12 @@ export class UploaderTask extends Task {
         return hDisplay + mDisplay + sDisplay;
     }
 
-    private save() {
+    private save(onFinishCallback: (err) => void = undefined) {
         try {
             EntityUpload.Instance.saveIpc({
                 key: this.file.getKey(),
                 path: this.file.getPath(),
-                lastModifies: this.file.getLastModifies(),
+                lastModifies: this.file.getLastModifies() ? this.file.getLastModifies() as any : '',
                 sessionData: this.session,
                 state: this.state,
                 file_id: this.file_id,
@@ -294,6 +356,10 @@ export class UploaderTask extends Task {
                     Logger.error(err);
                 } else {
                     Logger.info(`Info saved ${this.file.getFullName()}`);
+                }
+
+                if (onFinishCallback) {
+                    onFinishCallback(err);
                 }
             });
 
@@ -315,6 +381,24 @@ export class UploaderTask extends Task {
             //this.job.Fail();
         }
     }
+
+    private async SignFile() {
+        this.state = UploadState.SIGIN;
+        this.upaki.signFile({
+            signatureId: this.signatureId,
+            fileId: this.file_id
+        }).then(rs => {
+            this.state = UploadState.FINISH;
+            this.save((err) => {
+                this.OnUploadFinish();
+            });
+            this.job.Finish();
+        }, err => {
+            Logger.error(err);
+            this.job.Fail(10000);
+        });
+    }
+
     private async MultiplePartUpload() {
         try {
             if (this.state === UploadState.ERROR) {
@@ -343,7 +427,7 @@ export class UploaderTask extends Task {
 
             let compressContent = ['webm', 'mp4'].indexOf(this.file.getExtension().toLowerCase()) === -1 && this.compactContent;
 
-            let upload = await this.upaki.MultipartUpload(this.file.getPath(), this.file.getKey(), this.session, { maxPartSize: 5242880, concurrentParts: 1 }, {}, this.file.getLastModifies(), compressContent);
+            let upload = await this.upaki.MultipartUpload(this.file.getPath(), this.file.getKey(), this.session, { maxPartSize: 5242880, concurrentParts: 1, uploadTimeout: this.UPLOAD_TIMEOUT }, {}, this.file.getLastModifies(), compressContent);
 
             upload.on('error', (error) => {
                 //if (error.code === 'CREATE_MULTIPART_ERROR') {
@@ -378,7 +462,8 @@ export class UploaderTask extends Task {
                         this.session.DataTransfered = 0;
                         this.save();*/
                         Logger.warn(`Upload ${this.file.getFullName()} upload ABORTED`);
-                        setTimeout(() => { this.job.Finish(); }, 3000);
+                        // removido 17/09/2019 nao é necessario
+                        //setTimeout(() => { this.job.Finish(); }, 3000);
                         return;
                     }
                     this.save();
@@ -410,7 +495,7 @@ export class UploaderTask extends Task {
             upload.on('part', (details) => {
                 if (!this.file.Exists()) {
                     this.state = UploadState.REMOVED;
-                    this.Cancel();
+                    this.Cancel(STOP_UPLOAD_DESCRIPTOR.FILE_NOT_FOUND_MULTIPART_UPLOAD_PART);
                     this.job.Finish();
                     return;
                 }
@@ -442,16 +527,27 @@ export class UploaderTask extends Task {
                 this.file_id = details.file_id;
                 this.Etag = details.Etag;
                 Logger.info(`Upload ${this.file.getFullName()} uploaded ${this.numberErrors} errors`);
-                this.state = UploadState.FINISH;
-                this.save();
+                this.state = this.signatureId ? UploadState.SIGIN : UploadState.FINISH;
+
+
+
+
+                if (this.signatureId && this.file.getExtension() && this.file.getExtension().toLowerCase() === 'pdf') {
+                    this.SignFile();
+                } else {
+                    // deletar somente apos salvar
+                    this.save((err) => {
+                        this.OnUploadFinish();
+                    });
+
+                    this.job.Finish();
+                }
 
                 if (Environment.config.useCluster) {
                     WorkerUpload.Instance.notifyUpload(this);
                 }
 
-                this.OnUploadFinish();
 
-                this.job.Finish();
             });
 
             upload.on('pausing', (details) => {
@@ -467,7 +563,7 @@ export class UploaderTask extends Task {
             upload.on('retrying', (partNumber, parts: Parts[]) => {
                 if (!this.file.Exists()) {
                     this.state = UploadState.REMOVED;
-                    this.Cancel();
+                    this.Cancel(STOP_UPLOAD_DESCRIPTOR.FILE_NOT_FOUND_MULTIPART_RETRY);
                     this.job.Finish();
                     return;
                 }
@@ -477,7 +573,7 @@ export class UploaderTask extends Task {
             upload.on('ready', (id) => {
                 if (!this.file.Exists()) {
                     this.state = UploadState.REMOVED;
-                    this.Cancel();
+                    this.Cancel(STOP_UPLOAD_DESCRIPTOR.FILE_NOT_FOUND_MULTIPART_READY);
                     this.job.Finish();
                     return;
                 }
@@ -536,8 +632,21 @@ export class UploaderTask extends Task {
         //     this.SinglePartUpload();
         //} else {
         if (!this.parameters) {
-            this.parameters = await EntityParameter.Instance.GetParams(['UPLOAD_TYPE', 'COMPACT_CONTENT_UPLOAD']);
+            this.parameters = await EntityParameter.Instance.GetParams(['UPLOAD_TYPE', 'COMPACT_CONTENT_UPLOAD', 'UPLOAD_TIMEOUT', 'AUTO_SIGN', 'SIGN_ID']);
             this.compactContent = this.parameters['COMPACT_CONTENT_UPLOAD'] === '1' ? true : false;
+            this.signatureId = this.parameters['AUTO_SIGN'] === '1' ? this.parameters['SIGN_ID'] : undefined;
+
+            if (this.state === UploadState.SIGIN) {
+                this.SignFile();
+                return;
+            }
+
+            try {
+                this.UPLOAD_TIMEOUT = Number(this.parameters['UPLOAD_TIMEOUT']);
+                Logger.info(`Set UPLOAD_TIMEOUT to ${this.UPLOAD_TIMEOUT}`);
+            } catch (error) {
+                Logger.error(error);
+            }
         }
 
         if (this.parameters['UPLOAD_TYPE'] === 'PART') {

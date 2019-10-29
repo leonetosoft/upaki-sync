@@ -27,6 +27,7 @@ export class Processor<T extends Task> {
     private interval: NodeJS.Timer;
     public eventEmitter: events.EventEmitter;
     private indexes: ProcessorIndexes<T> = {};
+    private processingJobs: Job<T>[] = [];
 
     countProcessing: number = 0;
 
@@ -76,22 +77,27 @@ export class Processor<T extends Task> {
     }
 
     getTotalQueue() {
-        return this.taskListHigh.length + this.taskListMedium.length + this.taskListLow.length;
+        return (this.taskListHigh.length + this.taskListMedium.length + this.taskListLow.length) - this.processingJobs.length;
     }
 
     trends(max: number) {
-        let trends_1 = this.taskListHigh.slice(0, max);
-        if (trends_1.length === max) {
-            return trends_1;
+        let trends_0 = this.processingJobs.slice(0, max);
+        if (trends_0.length === max) {
+            return trends_0;
         }
 
-        let trends_2 = this.taskListMedium.slice(0, max - trends_1.length);
+        let trends_1 = this.taskListHigh.slice(0, max - trends_0.length).filter(el => trends_0.findIndex(fd => fd.id === el.id) === -1);
+        if ((trends_1.length + trends_0.length) === max) {
+            return [...trends_0, ...trends_1];
+        }
+
+        let trends_2 = this.taskListMedium.slice(0, max - trends_0.length - trends_1.length).filter(el => trends_0.findIndex(fd => fd.id === el.id) === -1);
         if ((trends_1.length + trends_2.length) === max) {
-            return [...trends_1, ...trends_2];
+            return [...trends_0, ...trends_1, ...trends_2];
         }
 
-        let trends_3 = this.taskListLow.slice(0, max - trends_1.length - trends_2.length);
-        return [...trends_1, ...trends_2, ...trends_3];
+        let trends_3 = this.taskListLow.slice(0, max - trends_0.length - trends_1.length - trends_2.length).filter(el => trends_0.findIndex(fd => fd.id === el.id) === -1);
+        return [...trends_0, ...trends_1, ...trends_2, ...trends_3];
     }
 
     byIndex(index: string, value: string): Job<T> {
@@ -108,12 +114,28 @@ export class Processor<T extends Task> {
         return this.indexes['id'][id];
     }
 
+    PutProcessing(jobs: Job<T>[]) {
+        for (const job of jobs) {
+            if (this.processingJobs.findIndex(el => el.id === job.id) === -1) {
+                this.processingJobs.push(job);
+            }
+        }
+    }
+
+    RemoveProcessingJob(job: Job<T>) {
+        const indexOfJob = this.processingJobs.findIndex((el) => el.id === job.id);
+        if (indexOfJob !== -1) {
+            this.processingJobs.splice(indexOfJob, 1);
+        }
+    }
+
     LoopFunction() {
         try {
             let jobs = this.DeQueue(); // Coleto as tarefas
 
             if (jobs.length > 0) {
                 this.countProcessing += jobs.length;
+                this.PutProcessing(jobs);
                 try {
                     this.fn.call(this, jobs);
                 } catch (err) {
@@ -211,6 +233,7 @@ export class Processor<T extends Task> {
             case PRIORITY_QUEUE.HIGH:
                 indexDel = this.taskListHigh.findIndex(jobFind => jobFind.id === job.id);
                 if (indexDel !== -1) {
+                    this.RemoveProcessingJob(job);
                     this.taskListHigh.splice(indexDel, 1);
                     this.countProcessing--;
                     this.eventEmitter.emit('taskUnQueue', job);
@@ -222,6 +245,7 @@ export class Processor<T extends Task> {
             case PRIORITY_QUEUE.LOW:
                 indexDel = this.taskListLow.findIndex(jobFind => jobFind.id === job.id);
                 if (indexDel !== -1) {
+                    this.RemoveProcessingJob(job);
                     this.taskListLow.splice(indexDel, 1);
                     this.countProcessing--;
                     this.eventEmitter.emit('taskUnQueue', job);
@@ -233,6 +257,7 @@ export class Processor<T extends Task> {
             case PRIORITY_QUEUE.MEDIUM:
                 indexDel = this.taskListMedium.findIndex(jobFind => jobFind.id === job.id);
                 if (indexDel !== -1) {
+                    this.RemoveProcessingJob(job);
                     this.taskListMedium.splice(indexDel, 1);
                     this.countProcessing--;
                     this.eventEmitter.emit('taskUnQueue', job);

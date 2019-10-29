@@ -23,6 +23,7 @@ export function getDefaultParameters() {
     return {
         MAX_UPLOAD_QUEUE: 1,
         MAX_RETRY_UPLOAD: 10,
+        UPLOAD_TIMEOUT: 600000,
         UPLOAD_RETRY_DELAY: 30000,
         MAX_PROCESS_FILES: 1000,
         UPLOAD_TYPE: 'PART',
@@ -38,6 +39,8 @@ export function getDefaultParameters() {
         PROXY_PROTOCOL: 'http',
         PROXY_USER: '',
         PROXY_PASS: '',
-        PROXY_ENABLE: 0
+        PROXY_ENABLE: 0,
+        AUTO_SIGN: 0,
+        SIGN_ID: ''
     };
 }

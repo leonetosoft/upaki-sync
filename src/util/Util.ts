@@ -6,7 +6,7 @@ import * as path from 'path';
 import { PRIORITY_QUEUE } from '../queue/task';
 import { UploaderTask } from '../sync/task/UploaderTask';
 import { Environment } from '../config/env';
-import { Upaki, UpakiArchiveList, UpakiUserProfile } from 'upaki-cli';
+import { Upaki, UpakiArchiveList, UpakiUserProfile, UpakiCertificate } from 'upaki-cli';
 import { Logger } from './Logger';
 import * as http from 'http';
 
@@ -86,6 +86,10 @@ export namespace Util {
     }
 
     export function getLastModifies(filename) {
+        if(!fs.existsSync(filename)) {
+            return false;
+        }
+        
         const stats = fs.statSync(filename);
         const lastModifies = moment(stats.mtime).format('YYYY-MM-DD HH:mm:ss');
         return lastModifies;
@@ -284,6 +288,12 @@ export namespace Util {
             Logger.error(error);
         }
         return profile.data;
+    }
+
+    export async function listAvailableSignatures(): Promise<UpakiCertificate[]> {
+        let upakiClient = new Upaki(Environment.config.credentials);
+        let sig = await upakiClient.listAvailableSignatures();
+        return sig.data;
     }
 
     export function WriteCache(cacheName, data, callback: (err: NodeJS.ErrnoException, cacheSource: string) => void) {

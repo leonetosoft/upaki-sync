@@ -8,6 +8,7 @@ import { Environment } from '../../config/env';
 import { S3StreamSessionDetails } from 'upaki-cli';
 import * as fs from 'fs';
 import { FunctionsBinding } from '../../ipc/FunctionsBinding';
+import { STOP_UPLOAD_DESCRIPTOR } from '../../api/stopUploadDescriptor';
 
 export enum FileTypeAction {
     ADD = 'ADD',
@@ -26,15 +27,6 @@ export class FileTask extends Task {
         this.filePath = file.filePath;
         this.action = action;
     }
-
-    /**
-     * Termina os uploads deste path
-     * @param path 
-     */
-    private StopUploadsOfPath(path) {
-        FunctionsBinding.Instance.StopUpload(path);
-    }
-
     /**
      * Termina as analises deste arquivo visto que a analise não pode continuar
      * 
@@ -111,6 +103,7 @@ export class FileTask extends Task {
                             // QueueUploader.Instance.addJob(this.ProcessPriority(new UploaderTask(this.file, fileData.sessionData)));
                             this.addUploadQueue(this.file, fileData.sessionData);
                         } else {
+                            FunctionsBinding.Instance.StopUpload(this.file.getPath(), STOP_UPLOAD_DESCRIPTOR.FILE_CHANGE);
                             Logger.warn(`File ${this.file.getPath()} reinit(FILE CHANGED) upload session data ${JSON.stringify(fileData.sessionData)}`);
                             fileData.sessionData.Parts = [];
                             // QueueUploader.Instance.addJob(this.ProcessPriority(new UploaderTask(this.file, {})));
@@ -126,7 +119,7 @@ export class FileTask extends Task {
 
                 this.job.Finish();
             } else if (this.action == FileTypeAction.CHANGE) {
-                this.StopUploadsOfPath(this.file.getPath());
+                FunctionsBinding.Instance.StopUpload(this.file.getPath(), STOP_UPLOAD_DESCRIPTOR.FILE_CHANGE);
                 if (fileData) {
                     try {
                         let continueParts = fileData.sessionData;
@@ -147,7 +140,7 @@ export class FileTask extends Task {
             } else if (this.action == FileTypeAction.UNLINK) {
                 if (fileData) {
                     try {
-                        this.StopUploadsOfPath(this.file.getPath());
+                        FunctionsBinding.Instance.StopUpload(this.file.getPath(), STOP_UPLOAD_DESCRIPTOR.FILE_UNLINK)
                     } catch (error) {
                         Logger.error(error);
                     } finally {

@@ -10,6 +10,7 @@ import { UIFunctionsBinding } from "../ipc/UIFunctionsBinding";
 import { WorkProcess } from "../api/thread";
 import { EntityParameter } from "../persist/entities/EntityParameter";
 import { Upaki } from 'upaki-cli';
+import { STOP_UPLOAD_DESCRIPTOR } from "../api/stopUploadDescriptor";
 
 export class WorkerUpload extends SystemWorker<any> {
     private static _instance: WorkerUpload;
@@ -89,13 +90,13 @@ export class WorkerUpload extends SystemWorker<any> {
         }
     }
 
-    public StopUploadsOfPath(path) {
+    public StopUploadsOfPath(path, descriptor: STOP_UPLOAD_DESCRIPTOR) {
         const byFilePath = QueueUploader.Instance.tasks.byIndex('filePath', path);
 
         if (byFilePath) {
             try {
                 Logger.debug(`Request cancel taskId=${byFilePath.task.id}`);
-                byFilePath.task.Cancel();
+                byFilePath.task.Cancel(descriptor);
             } catch (error) {
                 Logger.error(error);
             }

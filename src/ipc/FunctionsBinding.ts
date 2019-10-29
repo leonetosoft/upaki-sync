@@ -17,6 +17,7 @@ import { WorkerDownload } from "../thread/WorkerDownload";
 import { DownloadUiAction } from "../api/download";
 import { WorkProcess } from "../api/thread";
 import { WorkerFileReceiver } from "../thread/WorkerFileReceiver";
+import { STOP_UPLOAD_DESCRIPTOR } from "../api/stopUploadDescriptor";
 
 export class FunctionsBinding {
     private static _instance: FunctionsBinding;
@@ -198,9 +199,9 @@ export class FunctionsBinding {
         mainWorter: WorkProcess.WORKER_UPLOAD,
         response: false
     })
-    StopUpload(src: string) {
+    StopUpload(src: string, descriptor: STOP_UPLOAD_DESCRIPTOR) {
         try {
-            WorkerUpload.Instance.StopUploadsOfPath(src);
+            WorkerUpload.Instance.StopUploadsOfPath(src, descriptor);
         } catch (error) {
             Logger.error(error);
         }

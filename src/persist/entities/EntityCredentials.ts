@@ -5,6 +5,7 @@ import { Environment } from '../../config/env';
 import { WorkerMaster } from "../../thread/WorkerMaster";
 import { Logger } from "../../util/Logger";
 import { CredentialDevice } from "../../api/entity";
+import { EntityParameter } from "./EntityParameter";
 
 export class EntityCredentials {
     private static _instance: EntityCredentials;
@@ -15,8 +16,27 @@ export class EntityCredentials {
 
     async Login(login: string, password: string, callback: (err, rs) => void) {
         let upaki = new Upaki(Environment.config.credentials);
+
         let name = os.hostname();
         try {
+            let proxyParams = await EntityParameter.Instance.GetParams(['PROXY_SERVER',
+            'PROXY_PORT',
+            'PROXY_PROTOCOL',
+            'PROXY_USER',
+            'PROXY_PASS',
+            'PROXY_ENABLE']);
+
+            if (Number(proxyParams['PROXY_ENABLE'])) {
+                Logger.debug(`Login Proxy agent: ${JSON.stringify(proxyParams)}`);
+                Upaki.UpdateProxyAgent({
+                    PROXY_SERVER: proxyParams['PROXY_SERVER'],
+                    PROXY_PORT: proxyParams['PROXY_PORT'],
+                    PROXY_PROTOCOL: proxyParams['PROXY_PROTOCOL'],
+                    PROXY_USER: proxyParams['PROXY_USER'],
+                    PROXY_PASS: proxyParams['PROXY_PASS']
+                });
+            }
+
             let dbCredential = await this.getCredentials();
             upaki.authDevice(login, password, name, UPAKI_DEVICE_TYPE.DESKTOP, os.platform(), dbCredential ? dbCredential.device_id : undefined).then(requestLogin => {
                 if (requestLogin.code === 1) {

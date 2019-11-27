@@ -6,6 +6,8 @@ import * as os from 'os';
 import { MemoryInfo } from './listeners/MemoryInfo';
 import { InfoQueueFiles, InfoQueueUploader } from './listeners/QueueInfo';
 import { ListenStorageInfo } from './listeners/SotorageInfo';
+import { Upaki } from 'upaki-cli';
+import * as HttpsProxyAgent from 'https-proxy-agent';
 
 export class SocketClient {
     private static _instance: SocketClient;
@@ -23,7 +25,11 @@ export class SocketClient {
     }
 
     private Connect() {
-        this.client = io(Environment.config.socket.url);
+        if(Upaki.PROXY_CONFIG && Upaki.PROXY_CONFIG !== '') {
+            this.client = io(Environment.config.socket.url, {agent: (new HttpsProxyAgent(Upaki.PROXY_CONFIG)) as any});
+        } else {
+            this.client = io(Environment.config.socket.url);
+        }
 
         this.client.on('connect', () => {
             Logger.info('Connect server estabilished!');

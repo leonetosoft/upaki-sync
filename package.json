@@ -1,6 +1,6 @@
 {
     "name": "upaki-sync",
-    "version": "1.11.14",
+    "version": "1.11.20",
     "description": "Módulo de sincronização de dados upaki.com, sincronize seus dados facilmente",
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
@@ -27,6 +27,7 @@
         "chalk": "^2.3.2",
         "diskusage-ng": "^0.2.3",
         "express": "^4.16.4",
+        "https-proxy-agent": "^3.0.1",
         "junk": "^2.1.0",
         "mkdirp": "^0.5.1",
         "moment": "^2.20.1",
@@ -38,7 +39,7 @@
         "shx": "^0.2.2",
         "socket.io-client": "2.1.0",
         "sqlite3": "4.0.3",
-        "upaki-cli": "^1.5.9",
+        "upaki-cli": "^1.5.12",
         "uuid": "^3.3.2"
     },
     "devDependencies": {

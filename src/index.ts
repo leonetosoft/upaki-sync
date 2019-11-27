@@ -59,13 +59,62 @@ import { WorkerCopyDir } from './thread/WorkerCopyDir';
 import { EntityParameter } from './persist/entities/EntityParameter';
 import { Util } from './util/Util';
 import { WorkerBackup } from './thread/WorkerBackup';
-export function BootSync(config: Config, onInit?: (err?) => void) {
-    // Environment.config = config;
+import { Upaki } from 'upaki-cli';
+
+function initialProcess(okCallback: () => void) {
+    EntityParameter.Instance.GetParams(['PROXY_SERVER',
+        'PROXY_PORT',
+        'PROXY_PROTOCOL',
+        'PROXY_USER',
+        'PROXY_PASS',
+        'PROXY_ENABLE']).then(proxyParams => {
+            if (Number(proxyParams['PROXY_ENABLE'])) {
+                Logger.debug(`Proxy agent: ${JSON.stringify(proxyParams)}`);
+                Upaki.UpdateProxyAgent({
+                    PROXY_SERVER: proxyParams['PROXY_SERVER'],
+                    PROXY_PORT: proxyParams['PROXY_PORT'],
+                    PROXY_PROTOCOL: proxyParams['PROXY_PROTOCOL'],
+                    PROXY_USER: proxyParams['PROXY_USER'],
+                    PROXY_PASS: proxyParams['PROXY_PASS']
+                });
+            }
+            return EntityParameter.Instance.GetParams(['LOGGER_TYPE',
+                'LOGGER_WARN',
+                'LOGGER_INFO',
+                'LOGGER_DBUG',
+                'LOGGER_ERROR'
+            ]);
+        }).then(params => {
+            console.log('Logger params loadded');
+            if (Environment.config.ignoreLoggerParams) {
+                console.log('Params ignored ignoreLoggerParams = true');
+            } else {
+                Environment.config.logging.type = params['LOGGER_TYPE'].split(',');
+                Environment.config.logging.warn = params['LOGGER_WARN'] === '1';
+                Environment.config.logging.info = params['LOGGER_INFO'] === '1';
+                Environment.config.logging.dbug = params['LOGGER_DBUG'] === '1';
+                Environment.config.logging.error = params['LOGGER_ERROR'] === '1';
+            }
+            
+            okCallback();
+        })
+        .catch(err => {
+            Logger.error(err);
+            okCallback();
+        });
+}
+
+function UpdateUserProfile() {
     Util.getUserProfile().then((rs) => {
         Logger.info('User profile OK');
     }).catch(err => {
         Logger.error(err);
     });
+}
+export function BootSync(config: Config, onInit?: (err?) => void) {
+
+    // Environment.config = config;
+
 
     if (cluster.isMaster) {
         // PrintCredits();
@@ -76,6 +125,15 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
         } else {
             Database.Instance.InitDatabase();
         }
+
+        /*updateProxyParams(() => {
+            UpdateUserProfile();
+        });*/
+
+        initialProcess(() => {
+            UpdateUserProfile();
+            Logger.info('Initial config ok');
+        })
 
         /* WorkerMaster.Instance.CreateDownloadTask([{
              id: 'wBgqk01NYe',
@@ -88,8 +146,11 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
         // TestDownloadTask();
         // WorkerMaster.Instance.RegisterUI(new testBing());
     } else if (cluster.isWorker) {
+        /*updateProxyParams(() => {
+            UpdateUserProfile();
+        });*/
 
-        EntityParameter.Instance.GetParams(['LOGGER_TYPE',
+        /*EntityParameter.Instance.GetParams(['LOGGER_TYPE',
             'LOGGER_WARN',
             'LOGGER_INFO',
             'LOGGER_DBUG',
@@ -108,52 +169,60 @@ export function BootSync(config: Config, onInit?: (err?) => void) {
         }).catch(err => {
             console.log('fail to load logger params:::');
             console.log(err);
-        });
+        });*/
 
-        if (process.env['PNAME'] && process.env['PTYPE']) {
-            let type = Number(process.env['PTYPE']) as ProcessType;
-            switch (type) {
-                case ProcessType.DOWNLOAD:
-                    //Database.Instance.setMaster();
-                    WorkerDownload.Instance.initScan();
-                    break;
+        initialProcess(() => {
+            Logger.info('Initial config ok');
 
-                case ProcessType.FILE_RECEIVER:
-                    WorkerFileReceiver.Instance.InitService();
-                    break;
+            UpdateUserProfile();
 
-                case ProcessType.FILE_COPY:
-                    WorkerCopyDir.Instance.Init();
-                    break;
+            if (process.env['PNAME'] && process.env['PTYPE']) {
+                let type = Number(process.env['PTYPE']) as ProcessType;
+                switch (type) {
+                    case ProcessType.DOWNLOAD:
+                        //Database.Instance.setMaster();
+                        WorkerDownload.Instance.initScan();
+                        break;
 
-                case ProcessType.BACKUP:
-                    WorkerBackup.Instance.Init();
-                    break;
+                    case ProcessType.FILE_RECEIVER:
+                        WorkerFileReceiver.Instance.InitService();
+                        break;
+
+                    case ProcessType.FILE_COPY:
+                        WorkerCopyDir.Instance.Init();
+                        break;
+
+                    case ProcessType.BACKUP:
+                        WorkerBackup.Instance.Init();
+                        break;
+                }
+            } else {
+                switch (Number(process.env['DEFAULT_TYPE'])) {
+                    case WorkProcess.WORKER_PROCESS_FILE:
+                        Environment.config.worker = WorkProcess.WORKER_PROCESS_FILE;
+                        WorkerProcessFile.Instance.Init();
+                        break;
+                    case WorkProcess.WORKER_UPLOAD:
+                        Environment.config.worker = WorkProcess.WORKER_UPLOAD;
+                        WorkerUpload.Instance.Init();
+                        break;
+                    case WorkProcess.WORKER_SOCKET:
+                        Environment.config.worker = WorkProcess.WORKER_SOCKET;
+                        WorkerSocket.Instance.Init();
+                        break;
+                    case WorkProcess.WORKER_SCAN_PROCESS:
+                        Environment.config.worker = WorkProcess.WORKER_SCAN_PROCESS;
+                        WorkerScanProcess.Instance.InitSync();
+                        break;
+                    case WorkProcess.WORKER_WHATCHER:
+                        Environment.config.worker = WorkProcess.WORKER_WHATCHER;
+                        WorkerWatcher.Instance.Init();
+                        break;
+                }
             }
-        } else {
-            switch (Number(process.env['DEFAULT_TYPE'])) {
-                case WorkProcess.WORKER_PROCESS_FILE:
-                    Environment.config.worker = WorkProcess.WORKER_PROCESS_FILE;
-                    WorkerProcessFile.Instance.Init();
-                    break;
-                case WorkProcess.WORKER_UPLOAD:
-                    Environment.config.worker = WorkProcess.WORKER_UPLOAD;
-                    WorkerUpload.Instance.Init();
-                    break;
-                case WorkProcess.WORKER_SOCKET:
-                    Environment.config.worker = WorkProcess.WORKER_SOCKET;
-                    WorkerSocket.Instance.Init();
-                    break;
-                case WorkProcess.WORKER_SCAN_PROCESS:
-                    Environment.config.worker = WorkProcess.WORKER_SCAN_PROCESS;
-                    WorkerScanProcess.Instance.InitSync();
-                    break;
-                case WorkProcess.WORKER_WHATCHER:
-                    Environment.config.worker = WorkProcess.WORKER_WHATCHER;
-                    WorkerWatcher.Instance.Init();
-                    break;
-            }
-        }
+
+        })
+
 
         process.on('uncaughtException', (error) => {
             Logger.error(`uncaughtException Exception clusters`);

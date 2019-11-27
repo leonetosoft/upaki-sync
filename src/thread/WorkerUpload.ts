@@ -25,7 +25,7 @@ export class WorkerUpload extends SystemWorker<any> {
 
     async Init() {
         // process.on('message', this.Listen.bind(this));
-        const proxyParams = await EntityParameter.Instance.GetParams(['PROXY_SERVER',
+        /*const proxyParams = await EntityParameter.Instance.GetParams(['PROXY_SERVER',
             'PROXY_PORT',
             'PROXY_PROTOCOL',
             'PROXY_USER',
@@ -41,7 +41,7 @@ export class WorkerUpload extends SystemWorker<any> {
                 PROXY_USER: proxyParams['PROXY_USER'],
                 PROXY_PASS: proxyParams['PROXY_PASS']
             });
-        }
+        }*/
         await QueueUploader.Instance.initTasks();
         QueueUploader.Instance.tasks.Start();
         this.UpdateUiHandler();

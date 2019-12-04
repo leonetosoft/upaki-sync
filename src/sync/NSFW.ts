@@ -94,7 +94,7 @@ export class NSFW extends NativeEventsEmitter {
                 return;
             }
 
-            let finder = filterChanges.find(el => el.key === change.key);
+            let finder = filterChanges.find(el => (el.key === change.key && el.action === change.action));
 
             if (!finder) {
 
@@ -130,6 +130,7 @@ export class NSFW extends NativeEventsEmitter {
                     // debounce changes in file
                     if(this.changesDebounce) {
                         clearTimeout(this.changesDebounce);
+                        this.changesDebounce = undefined;
                     }
                     this.changesDebounce = setTimeout(() => {
                         this.emit('MODIFIED', evtEmit);
@@ -157,9 +158,7 @@ export class NSFW extends NativeEventsEmitter {
     Init() {
         this.whatch = nsfw(this.rootDir, (events) => {
             // handle events
-            // console.log(events.length);
             let files = [];
-            // console.log(events); leo das    aadasd  da dasd 
             events.forEach((element) => {
                 try {
                     let pathCheck = element.action !== Action.RENAMED ? path.join(element.directory, element.file) : path.join(element.directory, element.newFile);

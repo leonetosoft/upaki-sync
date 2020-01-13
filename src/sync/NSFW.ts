@@ -49,6 +49,7 @@ export class NSFW extends NativeEventsEmitter {
     whatch: any;
     awaitingCopy: ChangesWhatch[] = [];
     changesDebounce;
+    timeoutChecks = {};
     constructor(rootDir: string) {
         super();
         this.rootDir = rootDir;
@@ -82,6 +83,46 @@ export class NSFW extends NativeEventsEmitter {
     isPendingCopy(key) {
         return this.awaitingCopy.findIndex(el => el.key === key) !== -1;
     }
+
+    checkEnd(path, prev, endFunction) {
+        Logger.debug('Check file if complete written');
+        if (this.timeoutChecks) {
+            clearTimeout(this.timeoutChecks[path]);
+        }
+
+        fs.stat(path, (err, stat) => {
+
+            // Replace error checking with something appropriate for your app.
+            if (err) {
+                Logger.warn(err);
+                // setTimeout(this.checkEnd, 10000, path, stat, endFunction);
+
+                if (err.code === 'ENOENT') {
+                    return;
+                }
+                if (this.checkEnd) {
+                    this.timeoutChecks[path] = setTimeout(this.checkEnd, 10000, path, stat, endFunction);
+                }
+
+                return;
+            }
+
+            if (prev !== undefined && stat.mtime.getTime() === prev.mtime.getTime()) {
+                if (this.timeoutChecks) {
+                    delete this.timeoutChecks[path];
+                }
+                Logger.debug(`Ok, file complete written ${path}`);
+                endFunction();
+                // Move on: call whatever needs to be called to process the file.
+            }
+            else {
+                if (this.checkEnd && this.timeoutChecks) {
+                    this.timeoutChecks[path] = setTimeout(this.checkEnd, 10000, path, stat, endFunction);
+                }
+            }
+        });
+    }
+
     /**
      * Organiza as soliciacoes
      * @param files 
@@ -128,12 +169,14 @@ export class NSFW extends NativeEventsEmitter {
             switch (evtEmit.action) {
                 case Action.MODIFIED:
                     // debounce changes in file
-                    if(this.changesDebounce) {
+                    if (this.changesDebounce) {
                         clearTimeout(this.changesDebounce);
                         this.changesDebounce = undefined;
                     }
                     this.changesDebounce = setTimeout(() => {
-                        this.emit('MODIFIED', evtEmit);
+                        this.checkEnd(evtEmit.key, undefined, () => {
+                            this.emit('MODIFIED', evtEmit);
+                        });
                     }, 1500);
                     break;
                 case Action.DELETED:
@@ -143,7 +186,9 @@ export class NSFW extends NativeEventsEmitter {
                     this.emit('RENAMED', evtEmit);
                     break;
                 case Action.CREATED:
-                    this.emit('CREATED', evtEmit);
+                    this.checkEnd(evtEmit.key, undefined, () => {
+                        this.emit('CREATED', evtEmit);
+                    });
                     break;
             }
         })

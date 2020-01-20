@@ -238,7 +238,7 @@ export class WorkerScanProcess extends SystemWorker<any> {
                         arquivos += notInList.length + sendFilesOnList.length;
 
                         for (let append of notInList) {
-                            fileAppend += `${append.filePath};null\n`;
+                            fileAppend += `${append.filePath}|null\n`;
                         }
 
                         for (let append of sendFilesOnList) {

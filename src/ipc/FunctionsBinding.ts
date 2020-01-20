@@ -78,7 +78,6 @@ export class FunctionsBinding {
     })
     ProcessFileLoteV2(rootFolder: string/*, callback: (err, rs) => void*/) {
         let retryCount = 0;
-
         let tryReadingFile = () => {
             try {
                 let source = path.join(os.tmpdir(), `upaki_read_${Util.MD5SRC(rootFolder)}.json`);
@@ -96,7 +95,7 @@ export class FunctionsBinding {
                         //WorkerProcessFile.Instance.PutFileQueue(line, rootFolder);
 
                         try {
-                            let filePaths = line.split(';');
+                            let filePaths = line.split('|');
 
                             let sessionData = filePaths[1] != 'null' ? JSON.parse(new Buffer(filePaths[1], 'base64').toString('utf8')) : {
                                 Parts: [],

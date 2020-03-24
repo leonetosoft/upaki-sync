@@ -18,6 +18,7 @@ export interface EntityUploadData {
     lastModifies: string;
     file_id: string;
     folder_id: string;
+    details: { Etag: string, file_id: string, folder_id: string };
     sessionData?: S3StreamSessionDetails;
     state: UploadState;
     Etag: string;

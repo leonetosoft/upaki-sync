@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import { EntityParameter } from '../../persist/entities/EntityParameter';
 import { STATUS } from '../../queue/stat';
 import { STOP_UPLOAD_DESCRIPTOR } from '../../api/stopUploadDescriptor';
+import { EntityUploadData } from '../../api/entity';
 
 export enum UploadState {
     AWAIT = 'AWAIT',
@@ -26,6 +27,7 @@ export enum UploadState {
     FINISH = 'FINISH',
     REMOVED = 'REMOVED',
     REINIT = 'REINIT',
+    AWAIT_COMPLETE_UPLOAD = 'AWAIT_COMPLETE_UPLOAD',
     LOCKED = 'LOCKED',
     SIGIN = 'SIGIN'
 }
@@ -45,6 +47,8 @@ export class UploaderTask extends Task {
     uploadType: UploadType = UploadType.SIMPLE;
     compactContent: boolean;
 
+    dataLoaded = false;
+
     UPLOAD_TIMEOUT = 0;
 
     simpleUploadeEmitter: UploadEvents;
@@ -58,6 +62,8 @@ export class UploaderTask extends Task {
     speedBps: number;
     speedType: string;
     speed: number;
+
+    details: { Etag: string, file_id: string, folder_id: string };
 
     signatureId: string;
 
@@ -84,6 +90,10 @@ export class UploaderTask extends Task {
         this.session = session;
         this.loaded = session.DataTransfered;
         this.upaki = new Upaki(Environment.config.credentials);
+    }
+
+    LoadDataFromDb(): Promise<EntityUploadData> {
+        return EntityUpload.Instance.getFile(this.file.filePath);
     }
 
     StopOrPauseUpload() {
@@ -246,6 +256,21 @@ export class UploaderTask extends Task {
 
     private async SinglePartUpload() {
         try {
+
+            if (this.state === UploadState.AWAIT_COMPLETE_UPLOAD) {
+                try {
+                    Logger.info('Send upload complete');
+                    await this.upaki.CompleteUpload(this.details.file_id);
+                    this.completeUploadTask(this.details);
+                    Logger.info('Send upload complete ----- OK');
+                } catch (error) {
+                    Logger.error(error);
+                    this.numberErrors++;
+                    this.job.Fail(Environment.config.queue.uploader.retryDelay);
+                }
+                return;
+            }
+
             Logger.debug(`Upload ${this.file.getFullName()} single part to ${this.file.getKey()}`);
             this.uploadType = UploadType.SIMPLE;
             let upload = await this.upaki.Upload(this.file.getPath(), this.file.getKey(), {}, this.file.getLastModifies());
@@ -258,20 +283,29 @@ export class UploaderTask extends Task {
             });
 
             upload.on('uploaded', (data) => {
-                Logger.debug(`Upload ${this.file.getFullName()} finished ${data}`);
-                this.folder_id = data.folder_id;
-                this.file_id = data.file_id;
-                this.Etag = data.Etag;
-                this.state = UploadState.FINISH;
-                // deletar somente após salvar
-                this.save((err) => {
-                    this.OnUploadFinish();
-                });
-                this.job.Finish();
+                /* Logger.debug(`Upload ${this.file.getFullName()} finished ${data}`);
+                 this.folder_id = data.folder_id;
+                 this.file_id = data.file_id;
+                 this.Etag = data.Etag;
+                 this.state = UploadState.FINISH;
+                 // deletar somente após salvar
+                 this.save((err) => {
+                     this.OnUploadFinish();
+                 });
+                 this.job.Finish();*/
+                this.completeUploadTask(data);
             });
 
-            upload.on('error', (err) => {
+            upload.on('error', (err: any) => {
                 Logger.error(err);
+                if (err.code === 'COMPLETE_UPLOAD_ERROR') {
+                    this.state = UploadState.AWAIT_COMPLETE_UPLOAD;
+                    this.details = err.details;
+                    this.job.Fail(Environment.config.queue.uploader.retryDelay);
+                    this.save();
+                    return;
+                }
+
                 if ((<any>err).code && (<any>err).code === 'RequestAbortedError') {
                     this.state = UploadState.STOP;
                     setTimeout(() => { this.job.Finish(); }, 3000);
@@ -350,6 +384,7 @@ export class UploaderTask extends Task {
                 state: this.state,
                 file_id: this.file_id,
                 folder_id: this.folder_id,
+                details: this.details,
                 Etag: this.Etag
             }, (err, data) => {
                 if (err) {
@@ -399,9 +434,30 @@ export class UploaderTask extends Task {
         });
     }
 
+    completeUploadTask(details) {
+        this.folder_id = details.folder_id;
+        this.file_id = details.file_id;
+        this.Etag = details.Etag;
+        Logger.info(`Upload ${this.file.getFullName()} uploaded ${this.numberErrors} errors`);
+        this.state = this.signatureId ? UploadState.SIGIN : UploadState.FINISH;
+        if (this.signatureId && this.file.getExtension() && this.file.getExtension().toLowerCase() === 'pdf') {
+            this.SignFile();
+        } else {
+            // deletar somente apos salvar
+            this.save((err) => {
+                this.OnUploadFinish();
+            });
+
+            this.job.Finish();
+        }
+        if (Environment.config.useCluster) {
+            WorkerUpload.Instance.notifyUpload(this);
+        }
+    }
+
     private async MultiplePartUpload() {
         try {
-            if (this.state === UploadState.ERROR) {
+            if (this.state === UploadState.ERROR && this.multipartUploadEmitter) {
                 this.multipartUploadEmitter.emit('retry');
                 this.state = UploadState.UPLOADING;
                 return;
@@ -414,6 +470,21 @@ export class UploaderTask extends Task {
             if (this.state === UploadState.REINIT) {
                 this.state = UploadState.UPLOADING;
                 Logger.info(`REINIT upload ${this.file.getFullName()} !`);
+            }
+
+            if (this.state === UploadState.AWAIT_COMPLETE_UPLOAD) {
+                try {
+                    Logger.info('Send upload complete');
+                    await this.upaki.CompleteUpload(this.details.file_id);
+                    this.completeUploadTask(this.details);
+                    Logger.info('Send upload complete ----- OK');
+                } catch (error) {
+                    Logger.error(error);
+                    this.numberErrors++;
+                    this.job.Fail(Environment.config.queue.uploader.retryDelay);
+                }
+
+                return;
             }
 
             this.uploadType = UploadType.MULTIPART;
@@ -436,7 +507,11 @@ export class UploaderTask extends Task {
                 //}
                 if (error.code) {
                     Logger.warn(`Error ${error.code} in uploading ${this.file.getFullName()} details: ${error.err ? error.err.message : 'Unknow err'}`);
-                    if (error.code === 'FATAL_ERROR') {
+                    if (error.code === 'COMPLETE_UPLOAD_ERROR') {
+                        this.state = UploadState.AWAIT_COMPLETE_UPLOAD;
+                        this.details = error.details;
+                    }
+                    else if (error.code === 'FATAL_ERROR') {
                         // um erro fatal e o upload foi abortado
                         this.session = {};
                         //this.save();
@@ -481,7 +556,7 @@ export class UploaderTask extends Task {
                     this.state = UploadState.ERROR;
                 }*/
                 if (this.state !== UploadState.STOP) {
-                    if (this.state !== UploadState.REINIT) {
+                    if (this.state !== UploadState.REINIT && this.state !== UploadState.AWAIT_COMPLETE_UPLOAD) {
                         this.state = UploadState.ERROR;
                     }
                     this.numberErrors++;
@@ -523,31 +598,32 @@ export class UploaderTask extends Task {
             });
 
             upload.on('uploaded', (details) => {
-                this.folder_id = details.folder_id;
-                this.file_id = details.file_id;
-                this.Etag = details.Etag;
-                Logger.info(`Upload ${this.file.getFullName()} uploaded ${this.numberErrors} errors`);
-                this.state = this.signatureId ? UploadState.SIGIN : UploadState.FINISH;
-
-
-
-
-                if (this.signatureId && this.file.getExtension() && this.file.getExtension().toLowerCase() === 'pdf') {
-                    this.SignFile();
-                } else {
-                    // deletar somente apos salvar
-                    this.save((err) => {
-                        this.OnUploadFinish();
-                    });
-
-                    this.job.Finish();
-                }
-
-                if (Environment.config.useCluster) {
-                    WorkerUpload.Instance.notifyUpload(this);
-                }
-
-
+                this.completeUploadTask(details);
+                /* this.folder_id = details.folder_id;
+                 this.file_id = details.file_id;
+                 this.Etag = details.Etag;
+                 Logger.info(`Upload ${this.file.getFullName()} uploaded ${this.numberErrors} errors`);
+                 this.state = this.signatureId ? UploadState.SIGIN : UploadState.FINISH;
+ 
+ 
+ 
+ 
+                 if (this.signatureId && this.file.getExtension() && this.file.getExtension().toLowerCase() === 'pdf') {
+                     this.SignFile();
+                 } else {
+                     // deletar somente apos salvar
+                     this.save((err) => {
+                         this.OnUploadFinish();
+                     });
+ 
+                     this.job.Finish();
+                 }
+ 
+                 if (Environment.config.useCluster) {
+                     WorkerUpload.Instance.notifyUpload(this);
+                 }
+ 
+ */
             });
 
             upload.on('pausing', (details) => {
@@ -622,6 +698,20 @@ export class UploaderTask extends Task {
             Logger.warn(`Invalid name of file ${this.file.getFullName()} !! removed queue!`);
             this.job.Finish();
             return;
+        }
+
+        if (!this.dataLoaded) {
+            try {
+                Logger.info(`Loading data from DB`);
+                const dataDb = await this.LoadDataFromDb();
+                if (dataDb) {
+                    this.state = dataDb.state;
+                    this.details = dataDb.details;
+                }
+                this.dataLoaded = true;
+            } catch (error) {
+                Logger.error(error);
+            }
         }
 
         this.timeStamp = Date.now();

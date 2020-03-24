@@ -36,9 +36,10 @@ if (!Environment.config.credentials ||
 Environment.config = development;
 if (cluster.isMaster) {
     Database.Instance.setMaster();
-    // Database.Instance.InitDatabase();
+     Database.Instance.InitDatabase();
 }
 EntityCredentials.Instance.RestoreCredentialsFromDb().then(rs => {
+    console.log(Environment.config.credentials);
     BootSync(Environment.config, (err) => {
         if (err) {
             console.log('Errors to start workers!');

@@ -49,7 +49,8 @@ async function folder(){
         folder_id: '55',
         state: UploadState.AWAIT,
         Etag: '????ASDASD',
-        path: 'leo/teste/php'
+        path: 'leo/teste/php',
+        details: {Etag: '', file_id: '', folder_id: ''}
     }, (err, data) => {
         if (err) {
             console.log('erro');

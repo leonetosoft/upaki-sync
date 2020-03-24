@@ -242,7 +242,7 @@ export class WorkerScanProcess extends SystemWorker<any> {
                         }
 
                         for (let append of sendFilesOnList) {
-                            fileAppend += `${append.path};${this.prepareDataInfo(append)}\n`;
+                            fileAppend += `${append.path}|${this.prepareDataInfo(append)}\n`;
                         }
 
                         this.AppendFastFile(fileAppend, src, (err) => {

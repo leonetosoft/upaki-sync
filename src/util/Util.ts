@@ -290,6 +290,10 @@ export namespace Util {
         return profile.data;
     }
 
+    export function getUpakiCli(): Upaki {
+        return new Upaki(Environment.config.credentials);
+    }
+
     export async function listAvailableSignatures(): Promise<UpakiCertificate[]> {
         let upakiClient = new Upaki(Environment.config.credentials);
         let sig = await upakiClient.listAvailableSignatures();

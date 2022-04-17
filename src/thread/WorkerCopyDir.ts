@@ -73,7 +73,7 @@ export class WorkerCopyDir extends SystemWorker<CopyDirProcData> {
             Logger.error(error);
         }
 
-        EntityFolderSync.Instance.AddFolder(pathDest, 0, 1, 0, 1, (err) => {
+        EntityFolderSync.Instance.AddFolder(pathDest, 0, 1, 0, 1, null, (err) => {
             if (!err) {
                 let dest = pathDest;
                 this.pData.destDir = dest;

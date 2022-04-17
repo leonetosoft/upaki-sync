@@ -76,6 +76,8 @@ export class UploaderTask extends Task {
 
     parameters;
 
+    preferred_folder_id;
+
 
     // para upload de varias partes
     session: S3StreamSessionDetails = {};
@@ -273,7 +275,7 @@ export class UploaderTask extends Task {
 
             Logger.debug(`Upload ${this.file.getFullName()} single part to ${this.file.getKey()}`);
             this.uploadType = UploadType.SIMPLE;
-            let upload = await this.upaki.Upload(this.file.getPath(), this.file.getKey(), {}, this.file.getLastModifies());
+            let upload = await this.upaki.Upload(this.file.getPath(), this.file.getKey(), {}, this.file.getLastModifies(), this.preferred_folder_id);
 
             upload.on('progress', (progress) => {
                 // console.log(progress.loaded, progress.total);
@@ -498,7 +500,7 @@ export class UploaderTask extends Task {
 
             let compressContent = ['webm', 'mp4'].indexOf(this.file.getExtension().toLowerCase()) === -1 && this.compactContent;
 
-            let upload = await this.upaki.MultipartUpload(this.file.getPath(), this.file.getKey(), this.session, { maxPartSize: 5242880, concurrentParts: 1, uploadTimeout: this.UPLOAD_TIMEOUT }, {}, this.file.getLastModifies(), compressContent);
+            let upload = await this.upaki.MultipartUpload(this.file.getPath(), this.file.getKey(), this.session, { maxPartSize: 5242880, concurrentParts: 1, uploadTimeout: this.UPLOAD_TIMEOUT, preferred_dest_folder_id: this.preferred_folder_id }, {}, this.file.getLastModifies(), compressContent);
 
             upload.on('error', (error) => {
                 //if (error.code === 'CREATE_MULTIPART_ERROR') {
@@ -738,6 +740,9 @@ export class UploaderTask extends Task {
                 Logger.error(error);
             }
         }
+
+        // load preferred folder_id
+       this.preferred_folder_id = await EntityFolderSync.Instance.PreferredDestFolder(this.file.rootFolder)
 
         if (this.parameters['UPLOAD_TYPE'] === 'PART') {
             this.MultiplePartUpload();

@@ -82,10 +82,20 @@ function initialProcess(okCallback: () => void) {
                 'LOGGER_WARN',
                 'LOGGER_INFO',
                 'LOGGER_DBUG',
-                'LOGGER_ERROR'
+                'LOGGER_ERROR',
+                'UPLOAD_FOLDER_SHARED'
             ]);
         }).then(params => {
             console.log('Logger params loadded');
+
+            Environment.config.uploadFolderShared =  params['UPLOAD_FOLDER_SHARED'] === '1';
+
+            if( Environment.config.uploadFolderShared) {
+                Logger.warn(`Option uploadFolderShared is enabled`);
+            } else{
+                Logger.info(`Option uploadFolderShared is disabled`);
+            }
+
             if (Environment.config.ignoreLoggerParams) {
                 console.log('Params ignored ignoreLoggerParams = true');
             } else {

@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import { Util } from '../util/Util';
 import * as uuidv1 from 'uuid/v1';
 import * as events from 'events';
-import { getSqlsStart, dbMaintance, getDefaultParameters } from './dbstart';
+import { getSqlsStart, dbMaintance, getDefaultParameters, groupedMaintence } from './dbstart';
 import { WorkProcess } from '../api/thread';
 import * as dgram from 'dgram';
 import { EntityParameter } from './entities/EntityParameter';
@@ -146,7 +146,7 @@ export class Database2 {
         this.server.listen(this.PORT, this.HOST);
     }
 
-    private startClient() {
+    private startClient(): Promise<void> {
         this.startingClinetConnection = true;
         return new Promise((resolve, reject) => {
             this.client = new net.Socket();
@@ -281,7 +281,7 @@ export class Database2 {
         /*}*/
     }
 
-    private CreationStartProm(sql: string, checkErrors = true) {
+    private CreationStartProm(sql: string, checkErrors = true): Promise<void> {
         return new Promise((resolve, reject) => {
             this.connection.run(sql, (rs, err) => {
                 if (checkErrors) {
@@ -701,19 +701,32 @@ export class Database {
         /*}*/
     }
 
-    private CreationStartProm(sql: string, checkErrors = true) {
+    private CreationStartProm(sql: string, checkErrors = true): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.connection.run(sql, (rs, err) => {
+            this.connection.run(sql,[], ( err) => {
                 if (checkErrors) {
                     if (err) {
-                        Logger.error(sql);
-                        Logger.error(err);
+                        //Logger.error(sql);
+                        //Logger.error(err);
                         reject(err);
                     } else {
                         resolve();
                     }
                 } else {
                     resolve();
+                }
+            });
+        });
+    }
+
+    private CreationStartPromGet(sql: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            this.connection.all
+            (sql,[], (err, rs) => {
+                if (err) {
+                     reject(err);
+                } else {
+                 resolve(rs);
                 }
             });
         });
@@ -730,21 +743,63 @@ export class Database {
             return this.CreationStartProm(sql, false);
         }).concat(EntityParameter.Instance.UpdateParameters(getDefaultParameters(), false))));*/
         return Promise.all(getSqlsStart().map(sql => {
-            return this.CreationStartProm(sql);
+            return this.CreationStartProm(sql, false);
         })).then(rs => {
             return Promise.all(dbMaintance().map(sql => {
                 return this.CreationStartProm(sql, false);
             }));
-        }).then(rs => {
+        })
+        .then(rs => {
+          /*  return Promise.all(groupedMaintence().map(sql => {
+                return Promise.all(sql.map(sql => {
+                    return this.CreationStartProm(sql, true);
+                }));
+            }));*/
+
+            return new Promise(async (resolve, reject) => {
+                for(const group of groupedMaintence()) {
+                    console.log(group);
+                    for(const sql of group) {
+                        try {
+                            Logger.info('GroupedMaintence: try exec::' + sql)
+                            if(typeof sql === 'string') 
+                            {
+                                await this.CreationStartProm(sql, true)
+                            } else {
+                                const test = sql as [string, (rs) => void];
+                                const ret = await this.CreationStartPromGet(test[0])
+                                test[1](ret);
+                            }
+                            Logger.info('GroupedMaintence: exec ok::' + sql)
+                        } catch (error) {
+                            Logger.info('GroupedMaintence: exec fail::' + sql)
+                            break;
+                        }
+                    }
+                }
+
+                resolve(undefined);
+            })
+        })
+        .then(rs => {
             return EntityParameter.Instance.UpdateParameters(getDefaultParameters(), false);
         }).then((rs) => {
             return EntityParameter.Instance.GetParams(['LOGGER_TYPE',
                 'LOGGER_WARN',
                 'LOGGER_INFO',
                 'LOGGER_DBUG',
-                'LOGGER_ERROR'
+                'LOGGER_ERROR',
+                'UPLOAD_FOLDER_SHARED'
             ]);
         }).then(params => {
+            Environment.config.uploadFolderShared =  params['UPLOAD_FOLDER_SHARED'] === '1';
+            
+            if( Environment.config.uploadFolderShared) {
+                Logger.warn(`Option uploadFolderShared is enabled`);
+            } else{
+                Logger.info(`Option uploadFolderShared is disabled`);
+            }
+
             if (Environment.config.ignoreLoggerParams) {
                 console.log('Params ignored ignoreLoggerParams = true');
                 return;

@@ -13,6 +13,7 @@ export var development: Config = {
         dbug: true,
         error: true
     },
+    uploadFolderShared: false,
     userProfile: undefined,
     credentials: {
         secretToken: "",

@@ -21,6 +21,7 @@ export interface Config {
         view_share_workgroup: string;
         view_type: string;
     },
+    uploadFolderShared: boolean,
     synchPath: string,
     credentialsPath: string,
     credentials?: { secretToken: string, credentialKey: string, deviceId?: string, userId?: string };

@@ -14,6 +14,7 @@ export var production: Config = {
         error: true
     },
     userProfile: undefined,
+    uploadFolderShared: false,
     credentials: {
         secretToken: "",
         credentialKey: ""

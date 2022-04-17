@@ -32,12 +32,12 @@ export class EntityUpload {
     save(upload: EntityUploadData, callback: (err: Error, data: any) => void) {
         let key = this.MD5SRC(upload.path);
         let data = JSON.stringify(upload);
-        Database.Instance.All(`SELECT data FROM ${this.table} WHERE key=? and user_id=?`, [key, Environment.config.credentials.userId], (err, row) => {
+        Database.Instance.All(`SELECT data FROM ${this.table} WHERE key=? ${!Environment.config.uploadFolderShared ?  `and user_id='${Environment.config.credentials.userId}'` : ''}`, [key], (err, row) => {
             if (err) {
                 callback(err, undefined);
             } else {
                 if (row[0]) {
-                    Database.Instance.Run(`UPDATE ${this.table} SET data=? WHERE key = ? and user_id=?`, [data, key, Environment.config.credentials.userId], (errInsert) => {
+                    Database.Instance.Run(`UPDATE ${this.table} SET data=? WHERE key = ? ${!Environment.config.uploadFolderShared ?  `and user_id='${Environment.config.credentials.userId}'` : ''}`, [data, key], (errInsert) => {
                         callback(errInsert, undefined);
                     });
                 } else {
@@ -57,7 +57,7 @@ export class EntityUpload {
     getFile(path: string): Promise<EntityUploadData> {
         return new Promise<EntityUploadData>((resolve, reject) => {
             let key = this.MD5SRC(path);
-            Database.Instance.Get(`SELECT data FROM ${this.table} WHERE key=? and user_id=?`, [key, Environment.config.credentials.userId], (err, row) => {
+            Database.Instance.Get(`SELECT data FROM ${this.table} WHERE key=? ${!Environment.config.uploadFolderShared ?  `and user_id='${Environment.config.credentials.userId}'` : ''}`, [key], (err, row) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -77,7 +77,7 @@ export class EntityUpload {
                 return this.MD5SRC(el);
             });
             // console.log(keys.join(','));
-            Database.Instance.All(`SELECT key, data FROM ${this.table} WHERE key in(${keys.map(k => { return `'${k}'`; }).join(`,`)}) and user_id=?`, [Environment.config.credentials.userId], (err, row) => {
+            Database.Instance.All(`SELECT key, data FROM ${this.table} WHERE key in(${keys.map(k => { return `'${k}'`; }).join(`,`)}) ${!Environment.config.uploadFolderShared ?  `and user_id='${Environment.config.credentials.userId}'` : ''}`, [], (err, row) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -106,7 +106,7 @@ export class EntityUpload {
         return new Promise<number>((resolve, reject) => {
             let key = this.MD5SRC(oldPath);
             let newKey = this.MD5SRC(newPath);
-            Database.Instance.Get(`SELECT data FROM ${this.table} WHERE key=? and user_id=?`, [key, Environment.config.credentials.userId], (err, row) => {
+            Database.Instance.Get(`SELECT data FROM ${this.table} WHERE key=? ${!Environment.config.uploadFolderShared ?  `and user_id='${Environment.config.credentials.userId}'` : ''}`, [key], (err, row) => {
                 if (err) {
                     reject(err);
                     return;
@@ -115,7 +115,7 @@ export class EntityUpload {
                     let data = JSON.parse(row.data) as EntityUploadData;
                     data.path = newPath;
 
-                    Database.Instance.Run(`UPDATE ${this.table} SET key=?, data=? WHERE key = ? and user_id=?`, [newKey, JSON.stringify(data), key, Environment.config.credentials.userId], (errInsert) => {
+                    Database.Instance.Run(`UPDATE ${this.table} SET key=?, data=? WHERE key = ? ${!Environment.config.uploadFolderShared ?  `and user_id='${Environment.config.credentials.userId}'` : ''}`, [newKey, JSON.stringify(data), key], (errInsert) => {
                         if (errInsert) {
                             reject(errInsert);
                             return;
@@ -132,7 +132,7 @@ export class EntityUpload {
     delete(path: string): Promise<number> {
         return new Promise<number>((resolve, reject) => {
             let key = this.MD5SRC(path);
-            Database.Instance.Run(`DELETE FROM ${this.table} WHERE key = ? and user_id=?`, [key, Environment.config.credentials.userId], (err) => {
+            Database.Instance.Run(`DELETE FROM ${this.table} WHERE key = ? ${!Environment.config.uploadFolderShared ?  `and user_id='${Environment.config.credentials.userId}'` : ''}`, [key], (err) => {
                 if (err) {
                     reject(err);
                 } else {

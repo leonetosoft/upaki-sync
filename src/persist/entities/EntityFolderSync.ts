@@ -39,6 +39,19 @@ export class EntityFolderSync {
         });
     }
 
+    public PreferredDestFolder(src): Promise<string> {
+        return new Promise((resolve, reject) => {
+            Database.Instance.Get('SELECT preferred_dest_folder_id FROM sync_folder WHERE user_id=? and folder=?', [Environment.config.credentials.userId, src], (err, row) => {
+                if (err) {
+                    Logger.error(err);
+                    reject(undefined);
+                } else {
+                    resolve(row && row.preferred_dest_folder_id ? row.preferred_dest_folder_id : undefined);
+                }
+            });
+        });
+    }
+
     public DeleteOnFinish(src): Promise<boolean> {
         return new Promise((resolve, reject) => {
             Database.Instance.Get('SELECT delete_on_finish FROM sync_folder WHERE user_id=? and folder=?', [Environment.config.credentials.userId, src], (err, row) => {
@@ -52,8 +65,8 @@ export class EntityFolderSync {
         });
     }
 
-    public AddFolder(src: string, delete_on_finish, delete_file, scan_delay = 0, realtime = 1, callback: (err: Error) => void) {
-        Database.Instance.Run('INSERT INTO sync_folder (folder, user_id, delete_on_finish, delete_file, scan_delay, realtime) VALUES(?, ?, ?, ?, ?, ?)', [src, Environment.config.credentials.userId, delete_on_finish, delete_file, scan_delay, realtime], (err) => {
+    public AddFolder(src: string, delete_on_finish, delete_file, scan_delay = 0, realtime = 1, preferred_dest_folder_id = null, callback: (err: Error) => void) {
+        Database.Instance.Run('INSERT INTO sync_folder (folder, user_id, delete_on_finish, delete_file, scan_delay, realtime, preferred_dest_folder_id) VALUES(?, ?, ?, ?, ?, ?,?)', [src, Environment.config.credentials.userId, delete_on_finish, delete_file, scan_delay, realtime, preferred_dest_folder_id], (err) => {
             if (!err) {
                 FunctionsBinding.Instance.AddScanDir(src, scan_delay);
                 FunctionsBinding.Instance.AddWatch(src);

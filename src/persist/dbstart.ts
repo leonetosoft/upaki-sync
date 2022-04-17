@@ -1,8 +1,10 @@
+import { Logger } from "../util/Logger";
+
 export function getSqlsStart() {
     return [
         `CREATE TABLE IF NOT EXISTS file (key NOT NULL, data TEXT, user_id TEXT, PRIMARY KEY ("key"))`,
         `CREATE TABLE IF NOT EXISTS folder (key NOT NULL, data TEXT, user_id TEXT, PRIMARY KEY ("key"))`,
-        `CREATE TABLE IF NOT EXISTS sync_folder (folder NOT NULL, user_id TEXT, PRIMARY KEY ("folder"))`,
+        `CREATE TABLE IF NOT EXISTS sync_folder (folder NOT NULL, user_id TEXT, PRIMARY KEY ("folder","user_id"))`,
         `CREATE TABLE task (pname TEXT NOT NULL, ptype INTEGER NOT NULL, pdata text, pstate INTEGER DEFAULT 0 NOT NULL, pdesc TEXT, user_id TEXT, autostart INTEGER DEFAULT 0 NOT NULL, PRIMARY KEY ("pname"))`,
         `CREATE TABLE credential (device_id text NOT NULL, credential_key text, token text, user_id TEXT, PRIMARY KEY ("device_id"))`,
         `UPDATE task SET pstate = 0 WHERE pstate <> 4`,
@@ -16,7 +18,29 @@ export function dbMaintance() {
         `ALTER TABLE sync_folder ADD delete_on_finish INTEGER DEFAULT 0 NOT NULL`,
         `ALTER TABLE sync_folder ADD scan_delay INTEGER DEFAULT 0 NOT NULL`,
         `ALTER TABLE sync_folder ADD realtime INTEGER DEFAULT 1 NOT NULL`,
-        `UPDATE parameter SET VALUE='file,sentry' WHERE KEY='LOGGER_TYPE' AND VALUE='file'`];
+        `UPDATE parameter SET VALUE='file,sentry' WHERE KEY='LOGGER_TYPE' AND VALUE='file'`,
+        `ALTER TABLE sync_folder ADD preferred_dest_folder_id TEXT`];
+}
+
+// groupedMaintence executa o grupo de query
+// caso alguma sql do grupo falhar todas vao falhar 
+// o proximo grupo executa normalmente
+export function groupedMaintence() {
+    return [
+        [
+            ["PRAGMA table_info('sync_folder')", (rs: { pk: number }[]) => {
+                const contains = rs.findIndex(rs => rs.pk === 2);
+                if (contains !== -1) {
+                    Logger.debug('already fix primarykey of table sync_folder')
+                    throw new Error('already fix primarykey of table sync_folder')
+                }
+            }],
+            'CREATE TABLE sync_folder_v2 (folder NOT NULL, user_id TEXT, delete_file INTEGER DEFAULT 0, delete_on_finish INTEGER DEFAULT 0,  scan_delay INTEGER DEFAULT 0, realtime INTEGER DEFAULT 1, PRIMARY KEY ("folder", "user_id"));',
+            'INSERT INTO sync_folder_v2(folder, user_id, delete_file, delete_on_finish, scan_delay, realtime) SELECT folder, user_id, delete_file, delete_on_finish, scan_delay, realtime FROM sync_folder;',
+            'DROP table  sync_folder;',
+            'ALTER TABLE sync_folder_v2 RENAME TO sync_folder;',
+        ]
+    ];
 }
 
 export function getDefaultParameters() {
@@ -41,6 +65,7 @@ export function getDefaultParameters() {
         PROXY_PASS: '',
         PROXY_ENABLE: 0,
         AUTO_SIGN: 0,
-        SIGN_ID: ''
+        SIGN_ID: '',
+        UPLOAD_FOLDER_SHARED: 0
     };
 }

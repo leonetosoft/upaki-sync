@@ -173,7 +173,7 @@ export class WorkerScanProcess extends SystemWorker<any> {
         }
     }
 
-    async ScanDir(src, scanDelay: number) {
+    async ScanDir(src, scanDelay: number): Promise<any> {
         try {
             return new Promise((resolve, reject) => {
                 let taskData = {
@@ -329,7 +329,7 @@ export class WorkerScanProcess extends SystemWorker<any> {
                     FunctionsBinding.Instance.ProcessFileLoteV2(src);
                     // MessageToWorker(WorkProcess.MASTER, { type: 'SCAN_DIR_NOTIFY', data: { folder: 'src', directory: '' } });
                     this.RemoveTask(src);
-                    resolve();
+                    resolve(undefined);
 
                     if (scanDelay) {
                         Logger.debug(`Scan delay Enabled! Next Scan ${src} is ${scanDelay}`);
